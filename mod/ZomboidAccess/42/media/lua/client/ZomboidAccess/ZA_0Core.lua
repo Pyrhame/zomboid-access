@@ -15,7 +15,7 @@ function ZA.mod(a, n)
     if r < 0 then r = r + n end
     return r
 end
-ZA.version = "0.9.3"
+ZA.version = "0.9.4"
 ZA.speechFile = "ZomboidAccess_speech.txt"
 ZA.cmdFile = "ZomboidAccess_cmd.txt"
 

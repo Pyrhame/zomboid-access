@@ -3,7 +3,7 @@ Zomboid Access
 
 Play Project Zomboid with a screen reader (NVDA, JAWS and others): menus, character creation, a scanner for everything around you, walking by itself (round zombies when they're near), zombie warnings and escape help, health and moodles, fighting with optional lock-on, inventory and looting, cooking, farming, foraging, fishing, crafting and building, driving with a steering tone or autodrive, and an interactive tutorial with a guide on the radio.
 
-This is an EARLY VERSION (0.9.3). It has been played through character creation, the tutorial, looting houses, fighting and dying many times, but not long-term survival. Please send what doesn't work (see Feedback at the end).
+This is an EARLY VERSION (0.9.4). It has been played through character creation, the tutorial, looting houses, fighting and dying many times, but not long-term survival. Please send what doesn't work (see Feedback at the end).
 
 New here? Start with the tutorial: New game, Challenges, "Zomboid Access Tutorial" (see Tutorial below).
 
