@@ -23,8 +23,8 @@ Installing, updating and removing
 ---------------------------------
 1. Start Project Zomboid once, wait about a minute, then close it with Alt+F4. (The game clears its mod list the first time it starts.)
    The very first time, the game stops on a Terms of Service screen before the main menu. Nothing reads it until the mod is installed, so just close the game there with Alt+F4.
-2. Exit Steam (Steam menu, Exit). Unzip this folder anywhere and run ZomboidAccessSetup.exe. It opens on a Status box that says what you have and what the newest version is, with that version's release notes in the box after it, then the buttons Install (or Update), Reinstall, Uninstall and Close. Install:
-   - checks GitHub for the newest version (if it can't, it installs the copy in this folder),
+2. Exit Steam (Steam menu, Exit). Download ZomboidAccessSetup.exe from the newest release (https://github.com/liliancoghlan1-tech/zomboid-access/releases/latest) and run it. It opens on a Status box that says what you have and what the newest version is, with that version's release notes in the box after it, then the buttons Install (or Update), Reinstall, Uninstall and Close. Install:
+   - downloads the newest version from GitHub (if Setup can't reach GitHub, download the release's .zip as well, unzip it anywhere and run ZomboidAccessSetup.exe from that folder: it installs the copy there),
    - copies the mod into your Zomboid\mods folder and turns it on (other mods you use stay on),
    - copies the speech bridge to %LOCALAPPDATA%\ZomboidAccess, and sets Project Zomboid's launch option in Steam so the bridge starts with the game and closes with it (any launch options you had, like -debug, are kept after it),
    - keeps a copy of itself there, with a Start menu entry, "Zomboid Access Setup", for updates,
