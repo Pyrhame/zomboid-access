@@ -143,6 +143,24 @@ namespace ZomboidAccessSetup
             return Process.GetProcessesByName("steam").Length > 0;
         }
 
+        // Steam's own way to exit (steam.exe -shutdown), so it saves its settings first; waits up to a minute.
+        public static bool Shutdown()
+        {
+            var dir = Dir();
+            if (dir == null || !File.Exists(Path.Combine(dir, "steam.exe"))) return false;
+            try { Process.Start(new ProcessStartInfo(Path.Combine(dir, "steam.exe"), "-shutdown") { UseShellExecute = false }); }
+            catch (Exception) { return false; }
+            for (int i = 0; i < 120 && Running(); i++) Thread.Sleep(500);
+            return !Running();
+        }
+
+        public static void Start()
+        {
+            var dir = Dir();
+            try { if (dir != null) Process.Start(new ProcessStartInfo(Path.Combine(dir, "steam.exe")) { UseShellExecute = true }); }
+            catch (Exception) { }
+        }
+
         static string Unescape(string s) { return Regex.Replace(s, @"\\(.)", "$1"); }
         static string Escape(string s) { return s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
 
@@ -472,6 +490,30 @@ namespace ZomboidAccessSetup
         readonly Action<string> say;
         public readonly List<string> Notes = new List<string>();
         public Installer(Action<string> say) { this.say = say; }
+        // Asks whether Setup may close Steam (true = yes). Without it, Setup never closes Steam.
+        public Func<bool> AskCloseSteam;
+        bool closedSteam;
+
+        // Steam keeps the launch options in memory and writes them back when it exits, so they can only be changed
+        // while it is closed. Offers to close it; returns true once it is.
+        bool SteamClosed()
+        {
+            if (!Steam.Running()) return true;
+            if (AskCloseSteam == null || !AskCloseSteam()) return false;
+            say("Closing Steam...");
+            if (!Steam.Shutdown()) { Notes.Add("Steam didn't close within a minute."); return false; }
+            closedSteam = true;
+            return true;
+        }
+
+        void ReopenSteam()
+        {
+            if (!closedSteam) return;
+            closedSteam = false;
+            say("Opening Steam again...");
+            Steam.Start();
+            Notes.Add("Closed Steam to change Project Zomboid's launch options, and opened it again.");
+        }
 
         // What must be true before changing anything. Returns a reason, or null.
         public static string Blocked()
@@ -579,27 +621,36 @@ namespace ZomboidAccessSetup
             var configs = Steam.Configs();
             if (configs.Count == 0) { Notes.Add("Couldn't find Steam's settings. " + manual); return; }
             bool any = false;
-            foreach (var c in configs)
+            try
             {
-                var old = Steam.LaunchOptions(c);
-                if (old == null) continue;   // this Steam account never started the game
-                any = true;
-                var rest = Steam.WithoutBridge(old);
-                if (Regex.IsMatch(rest, "%command%"))
+                foreach (var c in configs)
                 {
-                    Notes.Add("Project Zomboid already has launch options that run another program, so they were left alone. " + manual);
-                    continue;
+                    for (int pass = 0; pass < 2; pass++)   // again once Steam is closed: it saves its settings as it exits
+                    {
+                        var old = Steam.LaunchOptions(c);
+                        if (old == null) break;   // this Steam account never started the game
+                        any = true;
+                        var rest = Steam.WithoutBridge(old);
+                        if (Regex.IsMatch(rest, "%command%"))
+                        {
+                            Notes.Add("Project Zomboid already has launch options that run another program, so they were left alone. " + manual);
+                            break;
+                        }
+                        var want = (Steam.BridgeOption() + " " + rest).Trim();
+                        if (want == old) { Notes.Add("Steam already starts the speech bridge with Project Zomboid."); break; }
+                        if (Steam.Running())
+                        {
+                            if (SteamClosed()) continue;
+                            Notes.Add("Steam was left running, so its launch options couldn't be changed. Run this again and let it close Steam, or: " + manual);
+                            return;
+                        }
+                        Steam.SetLaunchOptions(c, want);
+                        Notes.Add("Steam now starts the speech bridge with Project Zomboid (launch options: " + want + ").");
+                        break;
+                    }
                 }
-                var want = (Steam.BridgeOption() + " " + rest).Trim();
-                if (want == old) { Notes.Add("Steam already starts the speech bridge with Project Zomboid."); continue; }
-                if (Steam.Running())
-                {
-                    Notes.Add("Steam is running, so its launch options couldn't be changed. Exit Steam (Steam menu, Exit) and run this again, or: " + manual);
-                    return;
-                }
-                Steam.SetLaunchOptions(c, want);
-                Notes.Add("Steam now starts the speech bridge with Project Zomboid (launch options: " + want + ").");
             }
+            finally { ReopenSteam(); }
             if (!any) Notes.Add("Steam doesn't list Project Zomboid as started yet. " + manual);
         }
 
@@ -680,18 +731,23 @@ namespace ZomboidAccessSetup
                 Notes.Add("Turned the mod off.");
             }
             var configs = Steam.Configs();
-            foreach (var c in configs)
+            try
             {
-                var old = Steam.LaunchOptions(c);
-                if (old == null || old.IndexOf("ZomboidAccessBridge.exe", StringComparison.OrdinalIgnoreCase) < 0) continue;
-                if (Steam.Running())
+                foreach (var c in configs)
                 {
-                    Notes.Add("Steam is running, so the speech bridge is still in Project Zomboid's launch options. Exit Steam and uninstall again, or remove it yourself: Project Zomboid, Properties, Launch Options.");
-                    break;
+                    var old = Steam.LaunchOptions(c);
+                    if (old == null || old.IndexOf("ZomboidAccessBridge.exe", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (!SteamClosed())
+                    {
+                        Notes.Add("Steam was left running, so the speech bridge is still in Project Zomboid's launch options, and the game won't start from Steam until it's out. Run Uninstall again and let it close Steam, or remove it yourself: Project Zomboid, Properties, Launch Options.");
+                        break;
+                    }
+                    old = Steam.LaunchOptions(c);   // as Steam saved it when it closed
+                    Steam.SetLaunchOptions(c, Steam.WithoutBridge(old));
+                    Notes.Add("Took the speech bridge out of Steam's launch options.");
                 }
-                Steam.SetLaunchOptions(c, Steam.WithoutBridge(old));
-                Notes.Add("Took the speech bridge out of Steam's launch options.");
             }
+            finally { ReopenSteam(); }
             StopBridge();
             try { if (File.Exists(Places.StartMenuLink)) File.Delete(Places.StartMenuLink); } catch (Exception) { }
             if (Directory.Exists(Places.Home))
@@ -882,6 +938,12 @@ namespace ZomboidAccessSetup
             }
             foreach (var b in new[] { main, reinstall, uninstall, close }) b.Enabled = false;
             var inst = new Installer(Say);
+            var why = what == "uninstall"
+                ? "To take the speech bridge out of Project Zomboid's launch options, Steam has to be closed. If it stays in, the game won't start from Steam once the bridge is removed."
+                : "To start the speech bridge with Project Zomboid, Setup sets the game's launch options in Steam, and Steam has to be closed for that.";
+            inst.AskCloseSteam = () => (bool)Invoke(new Func<bool>(() => MessageBox.Show(this,
+                "Steam is running. " + why + "\r\n\r\nClose Steam now? Setup opens it again when it's done.",
+                Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes));
             new Thread(() =>
             {
                 string error = null, temp = null;
