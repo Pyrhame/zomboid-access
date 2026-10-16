@@ -69,19 +69,20 @@ function F.describeBare(ui)
     if t == "ISButton" then
         local title = ui.title or (ui.getTitle and ui:getTitle()) or ""
         if title == "" and ui.tooltip then title = ui.tooltip end
-        return ZA.clean(title) .. ", button", ""
+        return ZA.tr("Focus_Button", ZA.clean(title)), ""
     elseif t == "ISLabel" then
         return ZA.clean(ui.name or ui:getName() or ""), ""
     elseif t == "ISTickBox" and #(ui.options or {}) > 1 then
         -- Several boxes in one control (Single Context Menu: Player 1 to 4): Up and Down move between the boxes
         -- first, and only past the last (or first) one to the next row, so say the box the cursor is on.
         local n, i = #ui.options, ui.joypadIndex or 1
-        local v = str(ui.options[i]) .. (ui.selected[i] and ", checked" or ", not checked") .. ZA.pos(i, n)
-        return v .. ". Up and Down move between the " .. n .. " boxes, then on; {Cross} ticks or unticks", v
+        local v = (ui.selected[i] and ZA.tr("Focus_Checked", str(ui.options[i])) or ZA.tr("Focus_NotChecked", str(ui.options[i])))
+            .. ZA.pos(i, n)
+        return v .. ". " .. ZA.tr("Focus_TickBoxes", n), v
     elseif t == "ISTickBox" then
         local parts = {}
         for i, o in ipairs(ui.options or {}) do
-            table.insert(parts, str(o) .. (ui.selected[i] and " checked" or " not checked"))
+            table.insert(parts, ui.selected[i] and ZA.tr("Focus_OptChecked", str(o)) or ZA.tr("Focus_OptNotChecked", str(o)))
         end
         local v = table.concat(parts, ", ")
         return v, v
@@ -94,20 +95,20 @@ function F.describeBare(ui)
             return v .. ZA.pos(i, #(ui.popup.items or {})), v
         end
         local v = F.comboText(ui)
-        return v .. ZA.pos(tostring(ui.selected), tostring(#(ui.options or {}))) .. ", drop-down list, {Cross} opens it", v
+        return ZA.tr("Focus_ComboHint", v .. ZA.pos(tostring(ui.selected), tostring(#(ui.options or {})))), v
     elseif t == "ISScrollingListBox" then
         local it = ui.items and ui.items[ui.selected]
-        local v = it and ZA.clean(it.text or "") or "empty"
+        local v = it and ZA.clean(it.text or "") or ZA.tr("Focus_Empty")
         return v .. ZA.pos(tostring(ui.selected), tostring(#(ui.items or {}))), v
     elseif t == "ISVolumeControl" then
         local v = tostring(ui.getVolume and ui:getVolume() or ui.volume or "?")
-        return "volume " .. v .. " of 10, Left and Right change it", "volume " .. v
+        return ZA.tr("Focus_Volume", v), ZA.tr("Focus_VolumeValue", v)
     elseif t == "ISTextEntryBox" then
         local v = ui:getText() or ""
-        return "edit box, " .. (v == "" and "empty" or v), v
+        return ZA.tr("Focus_EditBox", v == "" and ZA.tr("Focus_Empty") or v), v
     elseif ui.getCurrentValue then
-        local v = "slider " .. tostring(ui:getCurrentValue())
-        return v .. ", Left and Right change it", v
+        local v = ZA.tr("Focus_Slider", tostring(ui:getCurrentValue()))
+        return ZA.tr("Focus_SliderHint", v), v
     end
     local txt = ui.title or ui.name or ""
     return ZA.clean(tostring(txt)) .. (t ~= "" and (" (" .. t .. ")") or ""), ""
@@ -119,9 +120,9 @@ F.padNames = { A = "{Cross}", B = "{Circle}", X = "{Square}", Y = "{Triangle}" }
 
 -- Names and a one-line purpose for whole screens, by their Lua type.
 F.screens = {
-    MainScreen = { name = "Main menu" },
-    NewGameScreen = { name = "New game: choose a game mode", hint = "Left and Right choose a mode" },
-    MapSpawnSelectListBox = { name = "Choose where you start", hint = "Up and Down choose a town" },
+    MainScreen = { name = ZA.tr("Focus_ScrMain") },
+    NewGameScreen = { name = ZA.tr("Focus_ScrNewGame"), hint = ZA.tr("Focus_ScrNewGameHint") },
+    MapSpawnSelectListBox = { name = ZA.tr("Focus_ScrSpawn"), hint = ZA.tr("Focus_ScrSpawnHint") },
 }
 
 function F.screenName(panel)
@@ -180,7 +181,7 @@ end
 function F.listReader(p)
     if not (p.items and p.selected) then return nil end
     local it = p.items[p.selected]
-    if not it then return p, "empty list", "" end
+    if not it then return p, ZA.tr("Focus_EmptyList"), "" end
     local text = ZA.clean(it.text or "")
     local data = it.item
     local desc = ""

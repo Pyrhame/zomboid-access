@@ -8,31 +8,23 @@ local S = ZA.S
 
 -- Room names -> what the building is, most telling first. Room names come from the map (seen in
 -- Muldraugh 2026-10-01: policeoffice, pharmacy, toolstore, gas2go, armysurplus...).
-local kinds = {
-    { "gunstore", "Gun store" }, { "armysurplus", "Army surplus store" }, { "police", "Police station" },
-    { "firestation", "Fire station" }, { "hospital", "Hospital" }, { "medical", "Medical clinic" },
-    { "pharmacy", "Pharmacy" }, { "hardware", "Hardware store" }, { "toolstore", "Tool store" },
-    { "mechanic", "Mechanic's garage" }, { "gas2go", "Gas 2 Go petrol station" }, { "gasstore", "Petrol station" },
-    { "fossoil", "Fossoil petrol station" }, { "grocery", "Grocery store" }, { "cornerstore", "Corner shop" },
-    { "generalstore", "General store" }, { "liquorstore", "Liquor store" }, { "warehouse", "Warehouse" },
-    { "farmstorage", "Farm" }, { "weldingworkshop", "Welding workshop" }, { "electronicsstore", "Electronics store" },
-    { "clothesstore", "Clothes shop" }, { "sportstore", "Sports shop" }, { "golfstore", "Golf shop" },
-    { "bookstore", "Book shop" }, { "library", "Library" }, { "comicstore", "Comic shop" },
-    { "candystore", "Sweet shop" }, { "pawnshop", "Pawn shop" }, { "movierental", "Video rental shop" },
-    { "barbequestore", "Barbecue shop" }, { "diner", "Diner" }, { "restaurant", "Restaurant" }, { "pizza", "Pizza place" },
-    { "spiffo", "Spiffo's restaurant" }, { "bar", "Bar" }, { "motel", "Motel" }, { "school", "School" },
-    { "classroom", "School" }, { "church", "Church" }, { "bank", "Bank" }, { "post", "Post office" },
-    { "gym", "Gym" }, { "fitness", "Gym" }, { "factory", "Factory" }, { "distillery", "Distillery" },
-    { "office", "Offices" }, { "storageunit", "Storage units" },
+local kinds = {   -- ids; the words are ScanPlaces_Kind_<id> and ScanPlaces_KindIn_<id> in the translations
+    "gunstore", "armysurplus", "police", "firestation", "hospital", "medical", "pharmacy", "hardware",
+    "toolstore", "mechanic", "gas2go", "gasstore", "fossoil", "grocery", "cornerstore", "generalstore",
+    "liquorstore", "warehouse", "farmstorage", "weldingworkshop", "electronicsstore", "clothesstore",
+    "sportstore", "golfstore", "bookstore", "library", "comicstore", "candystore", "pawnshop", "movierental",
+    "barbequestore", "diner", "restaurant", "pizza", "spiffo", "bar", "motel", "school", "classroom",
+    "church", "bank", "post", "gym", "fitness", "factory", "distillery", "office", "storageunit",
 }
 
+-- Returns what the building is ("Pharmacy") and the phrase that puts you inside it ("in the Pharmacy").
 local function buildingKind(b)
     local rooms = b:getRooms()
     local names = {}
     for j = 0, rooms:size() - 1 do names[rooms:get(j):getName() or ""] = true end
-    for _, k in ipairs(kinds) do
+    for _, id in ipairs(kinds) do
         for n in pairs(names) do
-            if n:find(k[1], 1, true) then return k[2] end
+            if n:find(id, 1, true) then return ZA.tr("ScanPlaces_Kind_" .. id), ZA.tr("ScanPlaces_KindIn_" .. id) end
         end
     end
     return nil
@@ -71,7 +63,7 @@ table.insert(S.builders, function(lists)
         local d = math.sqrt((x - px) ^ 2 + (y - py) ^ 2)
         local cat
         if kind and not res then cat = "places"
-        elseif res and d <= 300 then cat = "houses"; kind = "House" end
+        elseif res and d <= 300 then cat = "houses"; kind = ZA.tr("ScanPlaces_Kind_house") end
         if cat and kind then
             local bb = b
             table.insert(lists[cat], {
@@ -80,7 +72,7 @@ table.insert(S.builders, function(lists)
                 name = function(e)
                     local visited = false
                     pcall(function() visited = bb:isHasBeenVisited() end)
-                    return e.baseName .. (visited and ", visited" or "")
+                    return e.baseName .. (visited and (", " .. ZA.tr("ScanPlaces_Visited")) or "")
                 end,
                 pos = function(e)
                     local pl = getPlayer()
@@ -111,7 +103,7 @@ table.insert(S.builders, function(lists)
         local here = d < 600
         table.insert(lists.places, {
             cat = "places", key = "places|town|" .. t.name, baseName = t.name, walk = "travel", far = true,
-            name = "Town: " .. t.name .. (here and ", you're in it" or ""), x = t.x, y = t.y, z = 0,
+            name = here and ZA.tr("ScanPlaces_TownHere", t.name) or ZA.tr("ScanPlaces_Town", t.name), x = t.x, y = t.y, z = 0,
         })
     end
 end)

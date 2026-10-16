@@ -31,7 +31,7 @@ function W.openLoot(container, itemName)
     pcall(function() ui:refreshBackpacks() end)
     local b, i = findButton(ui, container)
     if not b then
-        ZA.say("It's not within reach yet. Get right next to it.")
+        ZA.say(ZA.tr("WalkUse_NotInReach"))
         return false
     end
     choose(ui, b, i, container)
@@ -71,7 +71,7 @@ function W.objectMenu(obj)
     local x = isoToScreenX(0, s:getX(), s:getY(), s:getZ())
     local y = isoToScreenY(0, s:getX(), s:getY(), s:getZ())
     local menu = ISContextManager.getInstance().createWorldMenu(0, nil, { obj }, x, y)
-    if not menu then ZA.say("Nothing to do with it."); return end
+    if not menu then ZA.say(ZA.tr("WalkUse_NothingToDo")); return end
     menu.origin = nil
     if not menu:getIsVisible() then menu:setVisible(true) end
     if menu.numOptions > 1 then
@@ -79,17 +79,17 @@ function W.objectMenu(obj)
         if jd then setJoypadFocus(0, menu) end
         menu.mouseOver = 1
     else
-        ZA.say("Nothing to do with it.")
+        ZA.say(ZA.tr("WalkUse_NothingToDo"))
     end
 end
 
 function W.use()
     local p = getPlayer()
-    if getGameSpeed() == 0 then ZA.say("The game is paused."); return end
+    if getGameSpeed() == 0 then ZA.say(ZA.tr("WalkUse_Paused")); return end
     local e = S.current()
-    if not e then ZA.say("Nothing selected."); return end
+    if not e then ZA.say(ZA.tr("WalkUse_NothingSelected")); return end
     if e.action then e.action(); return end
-    if not S.alive(e) then ZA.say(S.entryName(e) .. " is gone."); return end
+    if not S.alive(e) then ZA.say(ZA.tr("WalkUse_Gone", S.entryName(e))); return end
     if e.marker then
         local t = getTimestampMs()
         if W.removeAsk == e.marker and t - (W.removeAskAt or 0) < 4000 then
@@ -97,23 +97,23 @@ function W.use()
             ZA.MK.remove(e.marker)
         else
             W.removeAsk, W.removeAskAt = e.marker, t
-            ZA.say("Remove " .. e.marker.name .. "? Hold {Square} again, or press Delete again, to remove it.")
+            ZA.say(ZA.tr("WalkUse_RemoveAsk", e.marker.name))
         end
         return
     end
     -- driving: autodrive to it (ZA_7DriveRoute)
     local veh = p:getVehicle()
     if veh and not e.noWhere and not e.action then
-        if veh:isDriver(p) and ZA.RT then ZA.RT.start(e, "auto") else ZA.say("Only the driver can drive there.") end
+        if veh:isDriver(p) and ZA.RT then ZA.RT.start(e, "auto") else ZA.say(ZA.tr("WalkUse_OnlyDriver")) end
         return
     end
-    if e.noWhere then ZA.say("Nothing to use there."); return end
+    if e.noWhere then ZA.say(ZA.tr("WalkUse_NothingToUse")); return end
     -- a foraging find: the game's own forage action (it walks you next to it first)
     if e.cat == "finds" and e.icon and ZA.FG then ZA.FG.pickUp(e); return end
     -- a vehicle: the game walks you to the driver's door, opens it and gets you in (ISVehicleMenu.onEnter)
     if e.obj and instanceof(e.obj, "BaseVehicle") then
         if W.action or W.travel or W.safe then W.stop(true) end
-        ZA.say("Getting into the driver's seat.")
+        ZA.say(ZA.tr("WalkUse_GettingIn"))
         ISVehicleMenu.onEnter(p, e.obj, 0)
         return
     end

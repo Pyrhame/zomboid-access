@@ -11,10 +11,10 @@ local CC = {}
 ZA.CC = CC
 
 local AREAS = {
-    { field = "listboxProf", name = "Occupations", cross = "{Cross} chooses this occupation" },
-    { field = "listboxTrait", name = "Good traits, they cost points", cross = "{Cross} adds the trait" },
-    { field = "listboxBadTrait", name = "Bad traits, they give you points", cross = "{Cross} adds the trait" },
-    { field = "listboxTraitSelected", name = "Your traits", cross = "{Cross} removes the trait" },
+    { field = "listboxProf", name = ZA.tr("CharCreate_AreaProf"), cross = ZA.tr("CharCreate_CrossProf") },
+    { field = "listboxTrait", name = ZA.tr("CharCreate_AreaGood"), cross = ZA.tr("CharCreate_CrossAdd") },
+    { field = "listboxBadTrait", name = ZA.tr("CharCreate_AreaBad"), cross = ZA.tr("CharCreate_CrossAdd") },
+    { field = "listboxTraitSelected", name = ZA.tr("CharCreate_AreaMine"), cross = ZA.tr("CharCreate_CrossRemove") },
 }
 
 local function screen(panel)
@@ -41,17 +41,18 @@ end
 local function pointsWords(n, short)
     if n == nil then return "" end
     if n < 0 then
-        return (-n) .. ((-n) == 1 and " point" or " points") .. " over budget"
-            .. (short and "" or ": add bad traits or remove good ones before you can go on")
+        local over = ZA.tr((-n) == 1 and "CharCreate_OverOne" or "CharCreate_OverMany", -n)
+        return short and over or ZA.tr("CharCreate_OverFix", over)
     end
-    return n .. (n == 1 and " point left" or " points left")
+    if n == 0 then return ZA.tr("CharCreate_LeftZero", n) end
+    return ZA.tr(n == 1 and "CharCreate_LeftOne" or "CharCreate_LeftMany", n)
 end
 
 local function costWords(trait, inYourList)
     local ok, c = pcall(trait.getCost, trait)
-    if not ok or c == nil or c == 0 then return inYourList and "free, it came with your occupation" or "" end
-    if c > 0 then return "costs " .. c .. (c == 1 and " point" or " points") end
-    return "gives " .. (-c) .. ((-c) == 1 and " point" or " points")
+    if not ok or c == nil or c == 0 then return inYourList and ZA.tr("CharCreate_FreeProf") or "" end
+    if c > 0 then return ZA.tr(c == 1 and "CharCreate_CostOne" or "CharCreate_CostMany", c) end
+    return ZA.tr((-c) == 1 and "CharCreate_GivesOne" or "CharCreate_GivesMany", -c)
 end
 
 -- What just changed: "Added Strong." / "Removed Strong." / "Occupation: Burglar."
@@ -61,12 +62,12 @@ local function changes(s)
     for _, it in ipairs(s.listboxTraitSelected.items or {}) do now[it.text] = true end
     local msg = {}
     if memo.screen == s and memo.traits then
-        for t in pairs(now) do if not memo.traits[t] then table.insert(msg, "Added " .. t) end end
-        for t in pairs(memo.traits) do if not now[t] then table.insert(msg, "Removed " .. t) end end
+        for t in pairs(now) do if not memo.traits[t] then table.insert(msg, ZA.tr("CharCreate_Added", t)) end end
+        for t in pairs(memo.traits) do if not now[t] then table.insert(msg, ZA.tr("CharCreate_Removed", t)) end end
     end
     local prof = s.profession
     if memo.screen == s and prof ~= memo.prof and prof then
-        msg = { "Occupation: " .. ZA.clean(prof:getUIName()) }
+        msg = { ZA.tr("CharCreate_Occupation", ZA.clean(prof:getUIName())) }
     end
     memo.screen, memo.traits, memo.prof = s, now, prof
     if #msg > 0 then memo.msg = table.concat(msg, ". ") end
@@ -80,13 +81,16 @@ F.readers.CharacterCreationProfessionListBox = function(p)
     local n = points(s)
     local it = p.items[p.selected]
     if not it then
-        return p, (#p.items == 0 and "Empty" or "Nothing selected, press Down"), pointsWords(n)
+        return p, (#p.items == 0 and ZA.tr("CharCreate_Empty") or ZA.tr("CharCreate_NoneSelected")), pointsWords(n)
     end
     local data = it.item
     local extra = ""
     if a.field == "listboxProf" then
         local ok, c = pcall(data.getCost, data)
-        if ok and c and c ~= 0 then extra = (c > 0 and ("gives " .. c .. " points") or ("costs " .. (-c) .. " points")) end
+        if ok and c and c ~= 0 then
+            if c > 0 then extra = ZA.tr(c == 1 and "CharCreate_GivesOne" or "CharCreate_GivesMany", c)
+            else extra = ZA.tr((-c) == 1 and "CharCreate_CostOne" or "CharCreate_CostMany", -c) end
+        end
     else
         extra = costWords(data, a.field == "listboxTraitSelected")
     end
@@ -96,7 +100,7 @@ F.readers.CharacterCreationProfessionListBox = function(p)
     local what = changes(s)
     -- Moving in the occupations list chooses what you land on: its name is already the line itself, so don't
     -- say "Occupation: Burglar" before "Burglar" on every step.
-    if a.field == "listboxProf" and what == "Occupation: " .. ZA.clean(it.text or "") then what = "" end
+    if a.field == "listboxProf" and what == ZA.tr("CharCreate_Occupation", ZA.clean(it.text or "")) then what = "" end
     return it, words, (what ~= "" and (what .. ". ") or "") .. pointsWords(n, true)
 end
 
@@ -109,12 +113,12 @@ F.screens.CharacterCreationProfessionListBox = {
         local parts = {}
         if s ~= lastScreen or F.fullIntro then
             lastScreen = s
-            table.insert(parts, "Occupation and traits")
+            table.insert(parts, ZA.tr("CharCreate_Title"))
             table.insert(parts, pointsWords(points(s)))
             table.insert(parts, a.name)
-            table.insert(parts, "Up and Down move. " .. a.cross)
-            table.insert(parts, "{L1} and {R1} switch between occupations, good traits, bad traits and your traits")
-            table.insert(parts, "When you're done, press {Circle}, then {Cross} for the next screen")
+            table.insert(parts, ZA.tr("CharCreate_UpDown", a.cross))
+            table.insert(parts, ZA.tr("CharCreate_SwitchHelp"))
+            table.insert(parts, ZA.tr("CharCreate_Done"))
         else
             table.insert(parts, a.name)
             table.insert(parts, a.cross)
@@ -128,11 +132,11 @@ F.screens.CharacterCreationProfession = {
     intro = function(panel)
         lastScreen = panel
         local n = points(panel)
-        local parts = { "Occupation and traits", pointsWords(n) }
-        if n ~= nil and n < 0 then table.insert(parts, "Next is locked until you are back to zero points or more") end
+        local parts = { ZA.tr("CharCreate_Title"), pointsWords(n) }
+        if n ~= nil and n < 0 then table.insert(parts, ZA.tr("CharCreate_NextLocked")) end
         local hints = F.buttonHints(panel)
         if hints ~= "" then table.insert(parts, hints) end
-        table.insert(parts, "Down goes back into the lists")
+        table.insert(parts, ZA.tr("CharCreate_BackIn"))
         return table.concat(parts, ". ")
     end,
 }
@@ -168,7 +172,7 @@ if CharacterCreationProfessionListBox and not CC.wrappedDown then
         origDown(self, button, joypadData)
         local a, _, s = areaOf(self)
         if button == Joypad.AButton and a and a.field == "listboxProf" and s.profession then
-            ZA.say(ZA.clean(s.profession:getUIName()) .. " selected")
+            ZA.say(ZA.tr("CharCreate_Selected", ZA.clean(s.profession:getUIName())))
         end
     end
 end

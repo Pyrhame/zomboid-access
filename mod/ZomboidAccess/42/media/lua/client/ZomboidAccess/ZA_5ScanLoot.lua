@@ -34,7 +34,7 @@ local function groupOf(item)
 end
 
 -- One container's items, one line per kind of item.
-local function addContainer(lists, c, obj, title, x, y, z, keyBase)
+local function addContainer(lists, c, obj, title, x, y, z, keyBase, onBody)
     local items = c:getItems()
     local byName, order = {}, {}
     for i = 0, items:size() - 1 do
@@ -46,9 +46,15 @@ local function addContainer(lists, c, obj, title, x, y, z, keyBase)
     for _, n in ipairs(order) do
         local b = byName[n]
         local g = groupOf(b.item)
+        local text
+        if b.count > 1 then
+            text = ZA.tr(onBody and "ScanLoot_OnBodyCount" or "ScanLoot_InCount", n, b.count, title)
+        else
+            text = ZA.tr(onBody and "ScanLoot_OnBody" or "ScanLoot_In", n, title)
+        end
         table.insert(lists[g], {
             cat = g, key = g .. "|" .. keyBase .. "|" .. n, baseName = n, itemName = n,
-            name = n .. (b.count > 1 and (", " .. b.count) or "") .. ", in the " .. title,
+            name = text,
             obj = obj, container = c, x = x, y = y, z = z, walk = "container", lootItem = true,
             alive = function(e) return e.obj:getSquare() ~= nil and e.container:getItems():size() > 0 end,
         })
@@ -78,7 +84,7 @@ table.insert(S.postBuilders, function(lists)
     for _, e in ipairs(lists.bodies) do
         local ok, c = pcall(function() return e.obj:getContainer() end)
         if near(e) and ok and c then
-            addContainer(lists, c, e.obj, e.baseName:lower(), e.x, e.y, e.z, e.key)
+            addContainer(lists, c, e.obj, e.baseName:lower(), e.x, e.y, e.z, e.key, true)
         end
     end
 end)

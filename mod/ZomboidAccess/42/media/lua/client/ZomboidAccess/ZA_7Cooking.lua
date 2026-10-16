@@ -29,19 +29,19 @@ local function follow(item, c)
     local ct, mtc, mtb = item:getCookingTime(), item:getMinutesToCook(), item:getMinutesToBurn()
     local say
     if item:isBurnt() then
-        if stage < 5 then stage, say = 5, name .. " has burnt" end
+        if stage < 5 then stage, say = 5, ZA.tr("Cooking_Burnt", name) end
     elseif item:isCooked() then
         local toBurn = (mtb > ct) and (ct - mtc) / math.max(1, mtb - mtc) or 1
         if toBurn >= 0.5 and stage < 4 then
-            stage, say = 4, name .. " is about to burn! Take it out"
+            stage, say = 4, ZA.tr("Cooking_AboutToBurn", name)
         elseif stage < 3 then
-            stage, say = 3, name .. " is cooked: take it out before it burns"
+            stage, say = 3, ZA.tr("Cooking_Cooked", name)
         end
     elseif ct > 0 and item:getHeat() > 1.6 then
         if ct >= mtc * 0.5 and stage < 2 then
-            stage, say = 2, name .. ", half cooked"
+            stage, say = 2, ZA.tr("Cooking_Half", name)
         elseif stage < 1 then
-            stage, say = 1, name .. " cooking, in the " .. where(c)
+            stage, say = 1, ZA.tr("Cooking_Cooking", name, where(c))
         end
     end
     CK.seen[id] = stage

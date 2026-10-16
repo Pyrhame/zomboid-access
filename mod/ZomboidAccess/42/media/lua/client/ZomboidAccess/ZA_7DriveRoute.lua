@@ -270,7 +270,7 @@ function RT.start(e, mode)
     if not ok or not res then
         RT.route = nil
         if not ok then print("[ZA] route error: " .. tostring(res)) end
-        ZA.say("No road found towards " .. S.entryName(e) .. " from here.")
+        ZA.say(ZA.tr("Route_NoRoad", S.entryName(e)))
         return true
     end
     local x, y, z = S.entryPos(e)
@@ -278,13 +278,13 @@ function RT.start(e, mode)
     if mode == "auto" then
         if not v:isEngineRunning() then
             RT.route = nil
-            ZA.say("Start the engine first: hold D-pad up, Start Engine.")
+            ZA.say(ZA.tr("Route_StartEngine"))
             return true
         end
         RT.route.speed = 0
-        ZA.say("Autodrive to " .. S.entryName(e) .. ", " .. where .. ". Brake with {Circle} to take over.")
+        ZA.say(ZA.tr("Route_AutoStart", S.entryName(e), where))
     else
-        ZA.say("Route to " .. S.entryName(e) .. ", " .. where .. ". The steering tone follows the route. {Square} or End stops it.")
+        ZA.say(ZA.tr("Route_Start", S.entryName(e), where))
     end
     ZA.log("[ZA] route " .. mode .. " to " .. e.key .. " (" .. #RT.route.pts .. " points)")
     return true
@@ -297,7 +297,7 @@ function RT.stop(quiet, why)
         local v = getPlayer() and getPlayer():getVehicle()
         if v then v:setRegulator(false) end
     end
-    if not quiet then ZA.say(why or "Route stopped.") end
+    if not quiet then ZA.say(why or ZA.tr("Route_Stopped")) end
 end
 
 local function setSpeed(v, kmh)
@@ -336,7 +336,7 @@ function RT.tick()
             if speed > 2 then brake(v); return end
         end
         RT.route = nil
-        ZA.say("Arrived: " .. S.entryName(r.entry) .. ".")
+        ZA.say(ZA.tr("Route_Arrived", S.entryName(r.entry)))
         return
     end
 
@@ -346,7 +346,7 @@ function RT.tick()
     local dPlanEnd = math.sqrt((r.endX - v:getX()) ^ 2 + (r.endY - v:getY()) ^ 2)
     if off > 8 or (not r.full and dPlanEnd < 40) or t - r.plannedAt > 8000 then
         if not RT.replan(v) then
-            RT.stop(false, "Lost the way: no road on from here. Route stopped.")
+            RT.stop(false, ZA.tr("Route_Lost"))
             return
         end
         i = 1
@@ -358,7 +358,7 @@ function RT.tick()
     r.steer = bearing(v, ax, ay)
     -- the route is behind you: say so, once each time
     if math.abs(r.steer) > 110 then
-        if not r.saidBehind then ZA.say("The route is behind you: turn around."); r.saidBehind = true end
+        if not r.saidBehind then ZA.say(ZA.tr("Route_Behind")); r.saidBehind = true end
     elseif math.abs(r.steer) < 60 then
         r.saidBehind = nil
     end
@@ -373,16 +373,16 @@ function RT.tick()
         end
         key = key or { x = tp.x, y = tp.y }
         if not said and dist > 15 then
-            ZA.say("Turn " .. way .. " in " .. math.floor(dist / 10 + 0.5) * 10 .. " metres")
+            ZA.say(ZA.tr(way == "right" and "Route_TurnRightIn" or "Route_TurnLeftIn", math.floor(dist / 10 + 0.5) * 10))
             r.saidTurn[key] = 1
         elseif (said or 0) < 2 and dist <= 15 then
-            ZA.say("Turn " .. way .. " now")
+            ZA.say(ZA.tr(way == "right" and "Route_TurnRightNow" or "Route_TurnLeftNow"))
             r.saidTurn[key] = 2
         end
     end
     -- how far to go, every 200 metres
     local band = math.floor(dEnd / 200)
-    if r.lastBand and band < r.lastBand then ZA.queue(S.where(tx, ty, 0) .. " to go") end
+    if r.lastBand and band < r.lastBand then ZA.queue(ZA.tr("Route_ToGo", S.where(tx, ty, 0))) end
     r.lastBand = band
 
     if r.mode ~= "auto" then return end
@@ -390,7 +390,7 @@ function RT.tick()
     -- ---- autodrive ----
     -- the player braked or reversed: the game switched cruise control off; the car is theirs
     if r.speed and r.speed > 0 and not r.stopping and not v:isRegulator() and t - (r.setAt or 0) > 500 then
-        RT.stop(false, "Autodrive off: you're driving.")
+        RT.stop(false, ZA.tr("Route_AutoOff"))
         return
     end
     -- speed: 40 on the open road, slower for a turn ahead, near zombies, and near the end
@@ -404,12 +404,12 @@ function RT.tick()
     -- (only things ON the road: the straight-line look ahead finds the trees beside every bend, and the route
     -- already goes round trees and walls)
     local la = DR.lastAhead
-    if la and (la.what == "Car" or la.what == "Something on the road") and la.d < math.max(8, speed / 3.6 * 2)
+    if la and (la.what == "Car" or la.what == "OnRoad") and la.d < math.max(8, speed / 3.6 * 2)
         and t - la.t < 600 then
         v:setRegulator(false)
         r.stopping = true
         if speed > 2 then brake(v); return end
-        RT.stop(false, DR.lastAhead.what .. " in the way. Autodrive off: steer round it yourself, or choose the place again.")
+        RT.stop(false, ZA.tr(DR.lastAhead.what == "Car" and "Route_InWayCar" or "Route_InWayRoad"))
         return
     end
     if want ~= r.speed then setSpeed(v, want); r.speed = want; r.setAt = t end

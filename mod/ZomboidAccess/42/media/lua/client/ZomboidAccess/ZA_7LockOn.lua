@@ -133,9 +133,9 @@ function LK.tick()
     if not t then t = pick(p) end
     if t ~= LK.target then
         if t then
-            ZA.urgent("Locked on: " .. S.threatText(t))
+            ZA.urgent(ZA.tr("LockOn_Locked", S.threatText(t)))
         elseif LK.target then
-            ZA.say("Lock-on free")
+            ZA.say(ZA.tr("LockOn_Free"))
         end
         LK.target = t
     end
@@ -152,7 +152,7 @@ function LK.tick()
         local now = getTimestampMs()
         if now - (LK.shoveSaid or 0) > 6000 then
             LK.shoveSaid = now
-            ZA.urgent("It has hold of you: {L2} shoves it off, then {R2}.")
+            ZA.urgent(ZA.tr("LockOn_Grabbed"))
         end
         return
     end
@@ -174,18 +174,17 @@ end
 table.insert(S.builders, function(lists)
     local p = getPlayer()
     table.insert(lists.you, {
-        cat = "you", key = "you|lockon", noWhere = true, order = 903, baseName = "Lock-on",
+        cat = "you", key = "you|lockon", noWhere = true, order = 903, baseName = ZA.tr("LockOn_Name"),
         name = function()
             local on = LK.isOn()
-            return "Lock-on: " .. (on and "on" or "off") .. ". Faces and aims at the nearest zombie within reach while you "
-                .. "stand still: {R2} swings. {Square} turns it " .. (on and "off" or "on")
+            return ZA.tr(on and "LockOn_HelpOn" or "LockOn_HelpOff")
         end,
         x = p:getX(), y = p:getY(), z = p:getZ(),
         action = function()
             local s = settings()
             s.lockOn = not (s.lockOn == true)
             LK.target = nil
-            ZA.say("Lock-on " .. (s.lockOn and "on" or "off") .. ".")
+            ZA.say(ZA.tr(s.lockOn and "LockOn_SwitchedOn" or "LockOn_SwitchedOff"))
         end,
     })
 end)
