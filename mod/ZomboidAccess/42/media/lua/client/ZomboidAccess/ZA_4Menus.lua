@@ -139,6 +139,11 @@ F.screens.ISContextMenu = {
         local back = menu.parent and menu.parent.Type == "ISContextMenu"
         return ZA.tr(back and "Menus_IntroSub" or "Menus_IntroOptions")
     end,
+    -- on opening: the menu's name and the selected option first, the buttons after (F7 still says it all first)
+    itemFirst = function(menu)
+        local back = menu.parent and menu.parent.Type == "ISContextMenu"
+        return ZA.tr(back and "Menus_NameSub" or "Menus_NameOptions"), ZA.tr(back and "Menus_HintSub" or "Menus_HintOptions")
+    end,
 }
 
 -- ---------- round menus ----------

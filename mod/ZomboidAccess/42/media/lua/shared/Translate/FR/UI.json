@@ -1203,5 +1203,9 @@
     "UI_ZA_Fishing_LineOutDistOne": "Ligne lancée, à %1 mètre. Attends une touche.",
     "UI_ZA_Fishing_MetreOne": "%1 mètre",
     "UI_ZA_Guide_MetreOne": "%1 mètre",
+    "UI_ZA_Menus_NameOptions": "Options",
+    "UI_ZA_Menus_NameSub": "Sous-menu",
+    "UI_ZA_Menus_HintOptions": "Haut et bas choisissent, {Cross} valide, {Circle} ferme",
+    "UI_ZA_Menus_HintSub": "Haut et bas choisissent, {Cross} valide, gauche revient en arrière",
     "UI_ZA_Core_DecimalSep": ","
 }

@@ -1203,5 +1203,9 @@
     "UI_ZA_Fishing_LineOutDistOne": "Line out, %1 metre. Wait for a bite.",
     "UI_ZA_Fishing_MetreOne": "%1 metre",
     "UI_ZA_Guide_MetreOne": "%1 metre",
+    "UI_ZA_Menus_NameOptions": "Options",
+    "UI_ZA_Menus_NameSub": "Submenu",
+    "UI_ZA_Menus_HintOptions": "Up and Down choose, {Cross} does it, {Circle} closes",
+    "UI_ZA_Menus_HintSub": "Up and Down choose, {Cross} does it, Left goes back",
     "UI_ZA_Core_DecimalSep": "."
 }

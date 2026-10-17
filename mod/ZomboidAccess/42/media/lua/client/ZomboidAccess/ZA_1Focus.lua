@@ -230,7 +230,13 @@ function F.poll()
         last.before = last.panel
         last.panel, last.key, last.value = panel, key, value
         if panel then
+            local sc = F.screens[panel.Type]
+            local okSplit, name, hint = false, nil, nil
+            if not back and words ~= "" and sc and sc.itemFirst then okSplit, name, hint = pcall(sc.itemFirst, panel) end
             if back and words ~= "" then ZA.say(words)
+            elseif okSplit and name then
+                ZA.say(name .. ". " .. words)
+                if hint and hint ~= "" then ZA.queue(hint) end
             else
                 ZA.say(F.screenIntro(panel))
                 if words ~= "" then ZA.queue(words) end
