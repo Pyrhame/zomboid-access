@@ -85,7 +85,9 @@ end
 
 local function catName(c)
     if not c or c == "" then return ZA.tr("Craft_Other") end
-    local t = getTextOrNull("IGUI_CraftCategory_" .. c)
+    -- the game's crafting window names them IGUI_CraftingCategories_<Name> (first letter upper case)
+    local t = getTextOrNull("IGUI_CraftingCategories_" .. string.upper(string.sub(c, 1, 1)) .. string.sub(c, 2))
+        or getTextOrNull("IGUI_CraftCategory_" .. c)
     return t or c
 end
 
