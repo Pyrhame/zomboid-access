@@ -1207,5 +1207,8 @@
     "UI_ZA_Menus_NameSub": "Sous-menu",
     "UI_ZA_Menus_HintOptions": "Haut et bas choisissent, {Cross} valide, {Circle} ferme",
     "UI_ZA_Menus_HintSub": "Haut et bas choisissent, {Cross} valide, gauche revient en arrière",
+    "UI_ZA_Scan_CurtainsOpen": "rideaux ouverts",
+    "UI_ZA_Scan_CurtainsClosed": "rideaux fermés",
+    "UI_ZA_Scan_NoCurtains": "sans rideaux",
     "UI_ZA_Core_DecimalSep": ","
 }

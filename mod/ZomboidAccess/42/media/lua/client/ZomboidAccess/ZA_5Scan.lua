@@ -184,6 +184,16 @@ local function windowName(e)
     elseif open then n = n .. ", " .. ZA.tr("Scan_Open")
     else n = n .. ", " .. ZA.tr("Scan_Closed") end
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
+    -- curtains (or a sheet hung on it): what hides you and your light from outside
+    local curtains = nil
+    pcall(function() curtains = o:HasCurtains() end)
+    if curtains then
+        local cOpen = false
+        pcall(function() cOpen = curtains:IsOpen() end)
+        n = n .. ", " .. ZA.tr(cOpen and "Scan_CurtainsOpen" or "Scan_CurtainsClosed")
+    else
+        n = n .. ", " .. ZA.tr("Scan_NoCurtains")
+    end
     return n
 end
 

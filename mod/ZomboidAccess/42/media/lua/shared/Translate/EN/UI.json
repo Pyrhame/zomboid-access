@@ -1207,5 +1207,8 @@
     "UI_ZA_Menus_NameSub": "Submenu",
     "UI_ZA_Menus_HintOptions": "Up and Down choose, {Cross} does it, {Circle} closes",
     "UI_ZA_Menus_HintSub": "Up and Down choose, {Cross} does it, Left goes back",
+    "UI_ZA_Scan_CurtainsOpen": "curtains open",
+    "UI_ZA_Scan_CurtainsClosed": "curtains closed",
+    "UI_ZA_Scan_NoCurtains": "no curtains",
     "UI_ZA_Core_DecimalSep": "."
 }
