@@ -161,6 +161,26 @@ local function objKey(o, x, y, z)
     return x .. "," .. y .. "," .. z .. ":" .. spriteName(o) .. ":" .. tostring(o:getObjectIndex())
 end
 
+-- Curtains (or a sheet hung up): what hides you and your light from outside. Read as the game does (ISZoneDisplay).
+local function curtainWords(o)
+    local curtains = nil
+    pcall(function() curtains = o:HasCurtains() end)
+    if not curtains then return ZA.tr("Scan_NoCurtains") end
+    local cOpen = false
+    pcall(function() cOpen = curtains:IsOpen() end)
+    return ZA.tr(cOpen and "Scan_CurtainsOpen" or "Scan_CurtainsClosed")
+end
+
+-- A door you can see through (glass, not a garage door), which can take curtains like a window.
+local function glassDoor(o)
+    local glass = false
+    pcall(function()
+        local props = o:getProperties()
+        glass = props ~= nil and props:has("doorTrans") and not props:has("GarageDoor")
+    end)
+    return glass
+end
+
 local function doorName(e)
     local o = e.obj
     local n = e.baseName
@@ -170,6 +190,7 @@ local function doorName(e)
     local barr = false
     pcall(function() barr = o:isBarricaded() end)
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
+    if instanceof(o, "IsoDoor") and glassDoor(o) then n = n .. ", " .. curtainWords(o) end
     return n
 end
 
@@ -184,17 +205,7 @@ local function windowName(e)
     elseif open then n = n .. ", " .. ZA.tr("Scan_Open")
     else n = n .. ", " .. ZA.tr("Scan_Closed") end
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
-    -- curtains (or a sheet hung on it): what hides you and your light from outside
-    local curtains = nil
-    pcall(function() curtains = o:HasCurtains() end)
-    if curtains then
-        local cOpen = false
-        pcall(function() cOpen = curtains:IsOpen() end)
-        n = n .. ", " .. ZA.tr(cOpen and "Scan_CurtainsOpen" or "Scan_CurtainsClosed")
-    else
-        n = n .. ", " .. ZA.tr("Scan_NoCurtains")
-    end
-    return n
+    return n .. ", " .. curtainWords(o)
 end
 
 local function switchName(e)
