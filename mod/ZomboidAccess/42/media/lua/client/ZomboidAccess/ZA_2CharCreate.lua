@@ -177,6 +177,17 @@ if CharacterCreationProfessionListBox and not CC.wrappedDown then
     end
 end
 
+-- R1 also starts the game's own "hold R1 and D-pad" navigation, at once on these lists (the hold delay is 0 unless
+-- the panel says R1 is also one of its buttons), so a press of R1 was always taken for that and never reached the
+-- switch below: only L1 worked (Marc, 2026-10-18). Saying so gives it the game's 250 ms: a short press switches,
+-- a long one still navigates (ISUIElement:getJoypadNavigateStartDelay, JoypadControllerData:onHoldButton).
+if CharacterCreationProfessionListBox and not CC.wrappedNav then
+    CC.wrappedNav = true
+    function CharacterCreationProfessionListBox:hasConflictWithJoypadNavigateStart()
+        return areaOf(self) ~= nil
+    end
+end
+
 local origRelease = JoypadControllerData.onReleaseButton
 function JoypadControllerData:onReleaseButton(button)
     local jd = self.joypad
