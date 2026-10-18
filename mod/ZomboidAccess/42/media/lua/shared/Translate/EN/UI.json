@@ -1210,5 +1210,6 @@
     "UI_ZA_Scan_CurtainsOpen": "curtains open",
     "UI_ZA_Scan_CurtainsClosed": "curtains closed",
     "UI_ZA_Scan_NoCurtains": "no curtains",
+    "UI_ZA_Menus_TeachesKnown": "you already know them",
     "UI_ZA_Core_DecimalSep": "."
 }

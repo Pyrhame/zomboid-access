@@ -239,8 +239,14 @@ function F.itemDetails(item)
             if sk and sk ~= "" and sk ~= "None" then
                 table.insert(parts, ZA.tr("Menus_SkillBook", tr("IGUI_perks_" .. sk) or sk, item:getMaxLevelTrained()))
             end
-            local rec = item:getTeachedRecipes()
-            if rec and rec:size() > 0 then table.insert(parts, rec:size() == 1 and ZA.tr("Menus_TeachesOne") or ZA.tr("Menus_TeachesMany", rec:size())) end
+            -- Build 42 calls them learned recipes (getTeachedRecipes is gone); say too when you know them all already
+            local rec = item:getLearnedRecipes()
+            if rec and rec:size() > 0 then
+                table.insert(parts, rec:size() == 1 and ZA.tr("Menus_TeachesOne") or ZA.tr("Menus_TeachesMany", rec:size()))
+                local known = false
+                pcall(function() known = getPlayer():getKnownRecipes():containsAll(rec) end)
+                if known then table.insert(parts, ZA.tr("Menus_TeachesKnown")) end
+            end
         end
     end)
     pcall(function()

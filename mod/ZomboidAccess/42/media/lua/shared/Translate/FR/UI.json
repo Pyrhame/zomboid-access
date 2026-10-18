@@ -1210,5 +1210,6 @@
     "UI_ZA_Scan_CurtainsOpen": "rideaux ouverts",
     "UI_ZA_Scan_CurtainsClosed": "rideaux fermés",
     "UI_ZA_Scan_NoCurtains": "sans rideaux",
+    "UI_ZA_Menus_TeachesKnown": "tu les connais déjà",
     "UI_ZA_Core_DecimalSep": ","
 }
