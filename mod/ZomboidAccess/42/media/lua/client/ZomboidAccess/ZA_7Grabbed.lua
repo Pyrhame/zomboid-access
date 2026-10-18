@@ -7,7 +7,8 @@
 ZA.GR = ZA.GR or {}
 local GR = ZA.GR
 
-GR.len = 3100      -- ms: the sound's length, after which it plays again if the grab goes on
+GR.len = 1000      -- ms: played again every second while the grab goes on (Marc, 2026-10-18: 3 s was too slow);
+                   -- the sound is heard for about 1.7 s, so each one overlaps the fading end of the one before
 GR.linger = 1200   -- ms without an attack before the grab counts as over
 GR.reach = 2       -- metres
 
@@ -27,16 +28,22 @@ local function attacker(p)
     return nil
 end
 
+-- Every sound of this grab still playing: all stopped when it ends.
+GR.audios = GR.audios or {}
+
 local function stop()
-    if GR.audio then pcall(function() GR.audio:stop() end) end
-    GR.audio = nil
+    for _, a in ipairs(GR.audios) do pcall(function() a:stop() end) end
+    GR.audios = {}
 end
 
 local function play(p)
-    stop()
     pcall(function()
-        GR.audio = getSoundManager():PlayWorldSoundImpl("ZA_Grabbed", false, math.floor(p:getX()), math.floor(p:getY()),
+        local a = getSoundManager():PlayWorldSoundImpl("ZA_Grabbed", false, math.floor(p:getX()), math.floor(p:getY()),
             math.floor(p:getZ()), 0, 40, 1, false)
+        if a then
+            table.insert(GR.audios, a)
+            if #GR.audios > 3 then table.remove(GR.audios, 1) end   -- older ones have finished by now
+        end
     end)
     GR.playedAt = getTimestampMs()
 end
