@@ -115,6 +115,24 @@ local function pick(p)
     return best
 end
 
+-- The zombie attacking you now (in its attack on you, IsoZombie:isZombieAttacking, as ZA_7Grabbed), the nearest
+-- if several, within reach of lock-on; nil if none.
+local function attacker(p)
+    local zl = getCell():getZombieList()
+    local best, bd
+    for i = 0, zl:size() - 1 do
+        local z = zl:get(i)
+        if usable(p, z) then
+            local d = dist(p, z)
+            if d <= LK.reach then
+                local ok, att = pcall(function() return z:isZombieAttacking(p) end)
+                if ok and att and (not best or d < bd) then best, bd = z, d end
+            end
+        end
+    end
+    return best
+end
+
 -- The player steering the aim with the right stick, away from the target: leave it to them.
 local tmp = Vector2.new(0, 0)
 local function manualAim(p, z, bind)
@@ -199,11 +217,17 @@ function LK.tick()
     if t and (not usable(p, t) or dist(p, t) > LK.keep) then
         t = nil
     end
+    -- a zombie attacking you (grabbing, biting) comes first, even over the one already locked on: otherwise you
+    -- would keep turning to the first and swinging at the wrong one (Marc, 2026-10-18)
+    local att = attacker(p)
+    if att then t = att end
     if not t then t = pick(p) end
     local fresh = t ~= LK.target
     if fresh then
         if t then
-            ZA.urgent(ZA.tr("LockOn_Locked", S.threatText(t)))
+            -- switched to a zombie grabbing you: after "Grabbed: L2 shoves it off" (ZA_7Grabbed), not over it
+            local say = (t == att) and ZA.queue or ZA.urgent
+            say(ZA.tr("LockOn_Locked", S.threatText(t)))
         elseif LK.target then
             ZA.say(ZA.tr("LockOn_Free"))
         end
