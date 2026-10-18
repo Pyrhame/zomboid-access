@@ -1211,5 +1211,8 @@
     "UI_ZA_Scan_CurtainsClosed": "curtains closed",
     "UI_ZA_Scan_NoCurtains": "no curtains",
     "UI_ZA_Menus_TeachesKnown": "you already know them",
+    "UI_ZA_Status_Exclaim": "%1!",
+    "UI_ZA_Menus_FluidAmountOne": "%1, %2 litre",
+    "UI_ZA_Menus_LitreSingularBelow": "0",
     "UI_ZA_Core_DecimalSep": "."
 }

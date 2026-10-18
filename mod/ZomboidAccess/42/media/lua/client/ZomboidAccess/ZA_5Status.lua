@@ -179,7 +179,7 @@ function ST.check()
             for _, part in ipairs(order) do table.insert(phrases, ZA.tr("Status_PartList", part, table.concat(byPart[part], ", "))) end
             local t = table.concat(phrases, ". ")
             ZA.log("[ZA] status: " .. t)
-            ZA.say(t .. "!")
+            ZA.say(ZA.tr("Status_Exclaim", t))
         end
         local changes = {}
         for k, m in pairs(now) do
