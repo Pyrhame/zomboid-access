@@ -1214,5 +1214,9 @@
     "UI_ZA_Status_Exclaim": "%1!",
     "UI_ZA_Menus_FluidAmountOne": "%1, %2 litre",
     "UI_ZA_Menus_LitreSingularBelow": "0",
+    "UI_ZA_LockOn_ProneFar": "Down, get closer: %1",
+    "UI_ZA_LockOn_ProneReach": "On the ground, in reach: {R2} hits",
+    "UI_ZA_LockOn_ProneStomp": "Right on it: {L2} stomps",
+    "UI_ZA_LockOn_TooFar": "Too far",
     "UI_ZA_Core_DecimalSep": "."
 }
