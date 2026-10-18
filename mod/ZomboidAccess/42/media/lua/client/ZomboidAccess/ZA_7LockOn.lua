@@ -72,6 +72,11 @@ end
 -- ground, in reach: R2 hits", then "Right on it: L2 stomps". Each said when it changes (the distance again when it
 -- changes by a metre). Returns true when a weapon swing would reach it.
 local function proneGuide(p, t, fresh)
+    -- ZA_7HeadStomp is taking you to its head, or has: it does the talking, and from its head you can strike
+    if ZA.HS and ZA.HS.handles and (ZA.HS.handles(t) or ZA.HS.wants(p, t)) then
+        LK.proneState = nil
+        return ZA.HS.phase == "placed"
+    end
     local d = dist(p, t)
     local reach = weaponReach(p)
     local state, canSwing

@@ -1,0 +1,232 @@
+-- Zomboid Access: stand at the head of a zombie on the ground (Marc, 2026-10-18).
+-- With lock-on on, when the zombie it is locked on to is on the ground within 2 metres, and no other zombie is
+-- standing within 3 metres, your character walks by itself to its head and faces it: a stomp (L2) or a swing
+-- there hits the head, which takes three times the damage (CombatManager.applyMeleeHitLocationDamage), while the
+-- legs take almost none. "Going to its head", then "In place: L2 stomps". Touching the left stick stops the walk
+-- (the game's own path action does it), and it all stops if the zombie gets up.
+--
+-- Where the head is: the game reads it from the skeleton (CombatManager.getBoneWorldPos), which mods can't call.
+-- But IsoGameCharacter:DoSwingCollisionBoneCheck(zombie, bone, r), which mods can call, says whether that bone of
+-- the zombie, as the animation shows it now, is within r of the character it is called on. Asked with ever finer
+-- r, it gives the distance from you to the head, and asked on the zombie itself, from its middle to its head.
+-- Two distances put the head at one of two mirror points; which way the zombie fell picks the likely one, and on
+-- arrival the distance is measured again (if the head isn't at your feet, the other point is tried).
+-- Bone 6 is Bip01_Head: the skinning bones are numbered in the skeleton's order (ImportedSkeleton), which is the
+-- order of SkeletonBone and of the frames in media/models_X/Skinned/MaleBody.x (Dummy01 0, Bip01 1, Pelvis 2,
+-- Spine 3, Spine1 4, Neck 5, Head 6).
+
+ZA.HS = ZA.HS or {}
+local HS = ZA.HS
+local S = ZA.S
+
+HS.HEAD = 6
+HS.trigger = 2.0     -- metres: a zombie on the ground this close sends you to its head
+HS.clear = 3.0       -- metres: no other zombie standing this close
+HS.beyond = 0.35     -- metres: where you stand, past the head on the side away from the body
+HS.placed = 0.55     -- metres: head this close to you counts as in place (the stomp reaches under 0.6)
+
+local function log(t) ZA.log("[ZA] head stomp: " .. t) end
+
+-- Distance from `ref` (a character) to `bone` of zombie z, from the game's own skeleton; nil if it can't be read.
+local function boneDist(ref, z, bone)
+    local function within(r)
+        local ok, res = pcall(function() return ref:DoSwingCollisionBoneCheck(z, bone, r) end)
+        if not ok then return nil end
+        return res
+    end
+    local hi = 3.0
+    local far = within(hi)
+    if far == nil or far == false then return nil end
+    local lo = 0
+    for _ = 1, 14 do
+        local mid = (lo + hi) / 2
+        if within(mid) then hi = mid else lo = mid end
+    end
+    return hi
+end
+HS.boneDist = boneDist
+
+local function down(z)
+    local d = false
+    pcall(function() d = z:isProne() or z:isOnFloor() end)
+    return d
+end
+
+local function standingNear(p, except)
+    local zl = getCell():getZombieList()
+    for i = 0, zl:size() - 1 do
+        local z = zl:get(i)
+        if z and z ~= except and not z:isDead() and math.floor(z:getZ()) == math.floor(p:getZ()) and not down(z) then
+            local dx, dy = z:getX() - p:getX(), z:getY() - p:getY()
+            if dx * dx + dy * dy <= HS.clear * HS.clear then return true end
+        end
+    end
+    return false
+end
+
+-- The two points where the head can be, the likely one first.
+local function headPoints(p, z)
+    local d1 = boneDist(p, z, HS.HEAD)       -- you to the head
+    local d2 = boneDist(z, z, HS.HEAD)       -- its middle to its head
+    if not d1 or not d2 then return nil end
+    if d2 < 0.2 or d2 > 1.6 then log("odd head distance " .. tostring(d2)); return nil end
+    local px, py, zx, zy = p:getX(), p:getY(), z:getX(), z:getY()
+    local D = math.sqrt((zx - px) ^ 2 + (zy - py) ^ 2)
+    if D < 0.05 then return nil end
+    local ux, uy = (zx - px) / D, (zy - py) / D
+    local a = (d1 * d1 - d2 * d2 + D * D) / (2 * D)
+    local h = math.sqrt(math.max(0, d1 * d1 - a * a))
+    local mx, my = px + a * ux, py + a * uy
+    local c1 = { x = mx - h * uy, y = my + h * ux }
+    local c2 = { x = mx + h * uy, y = my - h * ux }
+    -- which way it fell: on its back the head lies behind where it faced, on its front ahead of it
+    local fx, fy = 0, 0
+    pcall(function() local v = z:getForwardDirection(); fx, fy = v:getX(), v:getY() end)
+    local front = false
+    pcall(function() front = z:isFallOnFront() end)
+    local s = front and 0.8 or -0.8
+    local gx, gy = zx + fx * s, zy + fy * s
+    local function off(c) return (c.x - gx) ^ 2 + (c.y - gy) ^ 2 end
+    log(string.format("you-head %.2f, middle-head %.2f, apart %.2f, %s", d1, d2, D, front and "on its front" or "on its back"))
+    if off(c2) < off(c1) then c1, c2 = c2, c1 end
+    if h < 0.05 then return { c1 } end
+    return { c1, c2 }
+end
+
+-- Where to stand for a head: a little past it, away from the body, so you face the head over the body's line.
+local function spotFor(z, hx, hy)
+    local zx, zy = z:getX(), z:getY()
+    local dx, dy = hx - zx, hy - zy
+    local l = math.sqrt(dx * dx + dy * dy)
+    if l < 0.01 then return hx, hy end
+    return hx + dx / l * HS.beyond, hy + dy / l * HS.beyond
+end
+
+local function stopWalk()
+    if HS.action then pcall(function() HS.action:forceStop() end) end
+    HS.action = nil
+end
+
+local function walkTo(p, x, y)
+    local a = ISPathFindAction:pathToLocationF(p, x, y, p:getZ())
+    HS.action, HS.spot = a, { x = x, y = y }
+    ISTimedActionQueue.add(a)
+end
+
+local function walking(p)
+    if not HS.action then return false end
+    local q = ISTimedActionQueue.getTimedActionQueue(p)
+    return q and q:indexOf(HS.action) > 0
+end
+
+-- Is z the zombie this module is handling right now (lock-on keeps quiet about it then)?
+function HS.handles(z)
+    return z ~= nil and z == HS.target and (HS.phase == "walking" or HS.phase == "placed")
+end
+
+-- Will this module take z on at its next turn (so lock-on shouldn't start guiding you to it)?
+function HS.wants(p, z)
+    if HS.target and HS.target ~= z then return false end
+    if HS.phase and HS.phase ~= "walking" and HS.phase ~= "placed" then return false end
+    if not down(z) then return false end
+    local dx, dy = z:getX() - p:getX(), z:getY() - p:getY()
+    return dx * dx + dy * dy <= HS.trigger * HS.trigger and not standingNear(p, z)
+end
+
+local function reset()
+    if HS.phase == "walking" then stopWalk() end
+    HS.target, HS.phase, HS.points, HS.try, HS.userMoved = nil, nil, nil, nil, nil
+end
+
+local function arrive(p, z)
+    local d = boneDist(p, z, HS.HEAD)
+    log("arrived, head at " .. tostring(d))
+    if d and d <= HS.placed then
+        HS.phase = "placed"
+        pcall(function() p:faceThisObject(z) end)
+        ZA.urgent(ZA.tr("HeadStomp_Placed"))
+        return
+    end
+    -- not at the head: the other point, once
+    if HS.points and HS.try < #HS.points then
+        HS.try = HS.try + 1
+        local c = HS.points[HS.try]
+        walkTo(p, spotFor(z, c.x, c.y))
+        return
+    end
+    HS.phase = "failed"
+    ZA.urgent(ZA.tr("HeadStomp_Failed"))
+end
+
+function HS.tick()
+    local p = getPlayer()
+    local LK = ZA.LK
+    if not p or p:isDead() or p:getVehicle() or not (LK and LK.isOn and LK.isOn()) then
+        if HS.target then reset() end
+        return
+    end
+    local t = LK.target
+    -- the one being handled got up, died, changed, or lock-on let go: stop
+    if HS.target and (t ~= HS.target or HS.target:isDead() or not down(HS.target)) then
+        reset()
+    end
+    if not t or not down(t) or t:isDead() then return end
+    local d = math.sqrt((t:getX() - p:getX()) ^ 2 + (t:getY() - p:getY()) ^ 2)
+
+    if HS.phase == "walking" then
+        local pushed = false
+        pcall(function() pushed = p:pressedMovement(false) end)
+        if pushed then HS.userMoved = true end
+        if not walking(p) then
+            HS.action = nil
+            local sx, sy = HS.spot.x - p:getX(), HS.spot.y - p:getY()
+            if sx * sx + sy * sy > 0.6 * 0.6 then
+                -- you took over with the stick: leave it to you
+                if HS.userMoved then HS.phase = "stopped"; log("stopped by the stick"); return end
+                -- no way to that spot: the other point, else give up
+                log("no way to the spot")
+                if HS.points and HS.try < #HS.points then
+                    HS.try = HS.try + 1
+                    local c = HS.points[HS.try]
+                    walkTo(p, spotFor(t, c.x, c.y))
+                else
+                    HS.phase = "failed"
+                    ZA.urgent(ZA.tr("HeadStomp_Failed"))
+                end
+                return
+            end
+            arrive(p, t)
+        end
+        return
+    end
+    if HS.phase then return end    -- placed, failed or stopped: once per zombie on the ground
+
+    if d > HS.trigger or standingNear(p, t) then return end
+    local moving = false
+    pcall(function() moving = p:isPlayerMoving() end)
+    if moving or p:isPerformingAnAction() then return end
+
+    HS.target = t
+    -- already at its head?
+    local hd = boneDist(p, t, HS.HEAD)
+    if hd and hd <= HS.placed then
+        HS.phase = "placed"
+        pcall(function() p:faceThisObject(t) end)
+        ZA.urgent(ZA.tr("HeadStomp_Placed"))
+        return
+    end
+    HS.points = headPoints(p, t)
+    if not HS.points then HS.phase = "failed"; log("head not readable"); return end
+    HS.try = 1
+    HS.phase = "walking"
+    ZA.urgent(ZA.tr("HeadStomp_Going"))
+    walkTo(p, spotFor(t, HS.points[1].x, HS.points[1].y))
+end
+
+if not HS.ticking then
+    HS.ticking = true
+    ZA.onTick(function()
+        local ok, err = pcall(HS.tick)
+        if not ok and not HS.errSaid then HS.errSaid = true; print("[ZA] head stomp error: " .. tostring(err)) end
+    end)
+end
