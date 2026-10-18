@@ -148,14 +148,8 @@ function LK.tick()
     -- Bitten or hit: the game drops your aim and won't let you swing until it's over. A shove breaks a grab.
     local hit = false
     pcall(function() local h = p:getHitReaction(); hit = h ~= nil and h ~= "" end)
-    if hit then
-        local now = getTimestampMs()
-        if now - (LK.shoveSaid or 0) > 6000 then
-            LK.shoveSaid = now
-            ZA.urgent(ZA.tr("LockOn_Grabbed"))
-        end
-        return
-    end
+    -- (the grab itself is announced, with its sound, by ZA_7Grabbed.lua, lock-on or not)
+    if hit then return end
     p:faceThisObject(t)
     if not bind then hold(p, false); return end
     hold(p, true)
