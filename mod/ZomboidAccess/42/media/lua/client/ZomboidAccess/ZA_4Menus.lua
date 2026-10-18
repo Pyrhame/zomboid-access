@@ -48,7 +48,13 @@ local function itemWords(entry, page)
         local fc = item:getFluidContainer()
         if fc then
             if fc:isEmpty() then table.insert(parts, ZA.tr("Menus_Empty"))
-            else table.insert(parts, ZA.tr("Menus_FluidAmount", ZA.clean(fc:getPrimaryFluid():getTranslatedName()), ZA.dec(fc:getAmount(), "%.1f"))) end
+            else
+                -- singular or plural as the language counts: English "1.0 litre", French below 2 ("0,2 litre")
+                local amt = fc:getAmount()
+                local below = tonumber(ZA.tr("Menus_LitreSingularBelow")) or 0
+                local one = string.format("%.1f", amt) == "1.0" or amt < below
+                table.insert(parts, ZA.tr(one and "Menus_FluidAmountOne" or "Menus_FluidAmount", ZA.clean(fc:getPrimaryFluid():getTranslatedName()), ZA.dec(amt, "%.1f")))
+            end
         end
     end)
     return table.concat(parts, ", ")
@@ -103,7 +109,8 @@ F.readers.ISInventoryPage = function(page)
         page.zaLastInv = inv        -- the screen intro already named it
     elseif page.zaLastInv ~= inv then
         page.zaLastInv = inv
-        words = cw .. ". " .. words
+        -- an empty container's words are already its name ("Oven, empty"): don't say them twice
+        if n > 0 then words = cw .. ". " .. words end
     end
     return key, words, ""
 end
@@ -125,7 +132,7 @@ F.readers.ISContextMenu = function(menu)
     local o = menu.options[i]
     local parts = { ZA.clean(o.name or "") }
     if o.subOption and not o.onSelect then table.insert(parts, ZA.tr("Menus_MoreInside")) end
-    if o.notAvailable then table.insert(parts, ZA.tr("Menus_NotAvailable")) end
+    if o.notAvailable and not o.zaInfo then table.insert(parts, ZA.tr("Menus_NotAvailable")) end
     local words = table.concat(parts, ", ") .. ZA.pos(i, count)
     pcall(function()
         local tip = o.toolTip and o.toolTip.description

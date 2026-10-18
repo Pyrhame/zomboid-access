@@ -82,7 +82,7 @@ local function townWords(px, py)
     end
     if not best then return nil end
     if bd < 700 then return ZA.tr("Where_In", best.name) end
-    return ZA.tr("Where_Outside", best.name, S.where(best.x, best.y, 0))
+    return ZA.tr("Where_Outside", best.name, S.where(best.x, best.y, 0, true))
 end
 
 function WH.text()

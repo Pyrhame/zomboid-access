@@ -195,7 +195,7 @@ function W.startTravel(p, e, warn)
     end
     local x, y, z = S.entryPos(e)
     ZA.log("[ZA] travel to " .. e.key)
-    ZA.say(warn .. ZA.tr("Walk_Travelling", S.entryName(e), S.where(x, y, z)))
+    ZA.say(warn .. ZA.tr("Walk_Travelling", S.entryName(e), S.where(x, y, z, e.far)))
 end
 
 -- A leg ended: go on, try another way round, or say we've arrived.
@@ -219,7 +219,7 @@ local function travelNext(p, ok)
     if tr.fails >= #turns or not travelLeg(p) then
         W.travel, W.action, W.entry = nil, nil, nil
         print("[ZA] travel stuck " .. e.key)
-        ZA.say(ZA.tr("Walk_NoFurther", S.entryName(e), S.where(x, y, z)))
+        ZA.say(ZA.tr("Walk_NoFurther", S.entryName(e), S.where(x, y, z, e.far)))
         return
     end
     -- a progress word every 50 metres

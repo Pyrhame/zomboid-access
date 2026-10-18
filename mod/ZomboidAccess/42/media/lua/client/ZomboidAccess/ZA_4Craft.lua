@@ -42,6 +42,7 @@ end
 local function info(menu, text)
     local o = menu:addOption(text, nil, nil)
     o.notAvailable = true
+    o.zaInfo = true     -- a line of information: not chosen, and not said "not available" either
     return o
 end
 

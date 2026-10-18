@@ -87,11 +87,12 @@ function S.direction(dx, dy)
     return ZA.tr(dirKeys[ZA.mod(math.floor((a + 22.5) / 45), 8) + 1])
 end
 
-function S.where(x, y, z)
+-- noFloor: far places, houses and towns, which only know the ground: no "1 floor down" when you're upstairs.
+function S.where(x, y, z, noFloor)
     local p = getPlayer()
     local dx, dy = x - p:getX(), y - p:getY()
     local d = math.sqrt(dx * dx + dy * dy)
-    local dz = math.floor(z) - math.floor(p:getZ())
+    local dz = noFloor and 0 or (math.floor(z) - math.floor(p:getZ()))
     local s
     if d < 1.2 then s = ZA.tr("Scan_NextToYou")
     elseif d >= 1000 then
@@ -668,7 +669,7 @@ end
 function S.describe(e, i, n)
     if e.noWhere then return (entryName(e):gsub("[%.%s]+$", "")) .. (i and ZA.pos(i, n) or "") end
     local x, y, z = entryPos(e)
-    local w = S.where(x, y, z)
+    local w = S.where(x, y, z, e.far)
     local room = ""
     if not e.far then pcall(function() room = S.roomPart(x, y, z) end) end
     return entryName(e) .. ", " .. w .. room .. (i and ZA.pos(i, n) or "")
