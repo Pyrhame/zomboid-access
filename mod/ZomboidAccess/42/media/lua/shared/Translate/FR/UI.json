@@ -1218,7 +1218,7 @@
     "UI_ZA_LockOn_ProneReach": "Au sol, à portée : {R2} frappe",
     "UI_ZA_LockOn_ProneStomp": "Collé : {L2} pour l'écraser",
     "UI_ZA_LockOn_TooFar": "Trop loin",
-    "UI_ZA_HeadStomp_Going": "Je me place à sa tête",
+    "UI_ZA_HeadStomp_Going": "Je me place à sa tête, attends",
     "UI_ZA_HeadStomp_Placed": "En place : {L2} pour écraser la tête",
     "UI_ZA_HeadStomp_Failed": "Impossible d'atteindre sa tête",
     "UI_ZA_Core_DecimalSep": ","

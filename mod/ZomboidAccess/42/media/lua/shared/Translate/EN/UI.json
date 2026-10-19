@@ -1218,7 +1218,7 @@
     "UI_ZA_LockOn_ProneReach": "On the ground, in reach: {R2} hits",
     "UI_ZA_LockOn_ProneStomp": "Right on it: {L2} stomps",
     "UI_ZA_LockOn_TooFar": "Too far",
-    "UI_ZA_HeadStomp_Going": "Going to its head",
+    "UI_ZA_HeadStomp_Going": "Going to its head, wait",
     "UI_ZA_HeadStomp_Placed": "In place: {L2} stomps the head",
     "UI_ZA_HeadStomp_Failed": "Can't get to its head",
     "UI_ZA_Core_DecimalSep": "."

@@ -179,6 +179,7 @@ function HS.tick()
         local pushed = false
         pcall(function() pushed = p:pressedMovement(false) end)
         if pushed then HS.userMoved = true end
+        pcall(function() if p:isAttackStarted() then HS.attacked = true end end)
         if not walking(p) then
             HS.action = nil
             local sx, sy = HS.spot.x - p:getX(), HS.spot.y - p:getY()
@@ -187,6 +188,15 @@ function HS.tick()
                 if HS.userMoved then HS.phase = "stopped"; log("stopped by the stick"); return end
                 -- dropped at once (in game 2026-10-19: twice in a row, right after a swing, then fine on the next
                 -- fall): the character was still busy; try the same point again, up to 3 times
+                -- A swing or a shove of yours cancels the walk (in game 2026-10-19: four tries, each cut by a swing):
+                -- those don't count, as long as it's within 6 seconds of the start.
+                local cut = HS.attacked
+                HS.attacked = false
+                if cut and getTimestampMs() - (HS.startAt or 0) < 6000 then
+                    HS.phase, HS.retryAt = "retry", getTimestampMs() + 300
+                    log("walk cut by a swing, again once it's over")
+                    return
+                end
                 if getTimestampMs() - (HS.walkAt or 0) < 600 and (HS.retries or 0) < 3 then
                     HS.retries = (HS.retries or 0) + 1
                     HS.phase, HS.retryAt = "retry", getTimestampMs() + 400
@@ -270,7 +280,7 @@ function HS.tick()
         return
     end
     HS.try = 1
-    HS.phase = "walking"
+    HS.phase, HS.startAt, HS.attacked = "walking", getTimestampMs(), false
     ZA.urgent(ZA.tr("HeadStomp_Going"))
     walkTo(p, spotFor(t, HS.points[1].x, HS.points[1].y))
 end
