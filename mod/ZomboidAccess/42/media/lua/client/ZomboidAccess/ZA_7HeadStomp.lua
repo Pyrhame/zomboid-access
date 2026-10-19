@@ -108,8 +108,10 @@ local function stopWalk()
 end
 
 local function walkTo(p, x, y)
+    -- lock-on holds the aim for you; let it go, or the walk can be dropped at once
+    pcall(function() if p:isForceAim() then p:setForceAim(false) end end)
     local a = ISPathFindAction:pathToLocationF(p, x, y, p:getZ())
-    HS.action, HS.spot = a, { x = x, y = y }
+    HS.action, HS.spot, HS.walkAt = a, { x = x, y = y }, getTimestampMs()
     ISTimedActionQueue.add(a)
 end
 
@@ -121,7 +123,7 @@ end
 
 -- Is z the zombie this module is handling right now (lock-on keeps quiet about it then)?
 function HS.handles(z)
-    return z ~= nil and z == HS.target and (HS.phase == "walking" or HS.phase == "placed")
+    return z ~= nil and z == HS.target and (HS.phase == "walking" or HS.phase == "retry" or HS.phase == "placed")
 end
 
 -- Will this module take z on at its next turn (so lock-on shouldn't start guiding you to it)?
@@ -135,7 +137,7 @@ end
 
 local function reset()
     if HS.phase == "walking" then stopWalk() end
-    HS.target, HS.phase, HS.points, HS.try, HS.userMoved = nil, nil, nil, nil, nil
+    HS.target, HS.phase, HS.points, HS.try, HS.userMoved, HS.retries = nil, nil, nil, nil, nil, nil
 end
 
 local function arrive(p, z)
@@ -183,6 +185,14 @@ function HS.tick()
             if sx * sx + sy * sy > 0.6 * 0.6 then
                 -- you took over with the stick: leave it to you
                 if HS.userMoved then HS.phase = "stopped"; log("stopped by the stick"); return end
+                -- dropped at once (in game 2026-10-19: twice in a row, right after a swing, then fine on the next
+                -- fall): the character was still busy; try the same point again, up to 3 times
+                if getTimestampMs() - (HS.walkAt or 0) < 600 and (HS.retries or 0) < 3 then
+                    HS.retries = (HS.retries or 0) + 1
+                    HS.phase, HS.retryAt = "retry", getTimestampMs() + 400
+                    log("walk dropped at once, again in a moment (" .. HS.retries .. ")")
+                    return
+                end
                 -- no way to that spot: the other point, else give up
                 log("no way to the spot")
                 if HS.points and HS.try < #HS.points then
@@ -197,6 +207,16 @@ function HS.tick()
             end
             arrive(p, t)
         end
+        return
+    end
+    if HS.phase == "retry" then
+        -- once the character is free (not swinging, not in another action), walk to the same point again
+        local busy = false
+        pcall(function() busy = p:isAttackStarted() or p:isPerformingAnAction() end)
+        if getTimestampMs() < HS.retryAt or busy then return end
+        HS.phase = "walking"
+        local c = HS.points[HS.try]
+        walkTo(p, spotFor(t, c.x, c.y))
         return
     end
     if HS.phase then return end    -- placed, failed or stopped: once per zombie on the ground
