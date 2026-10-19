@@ -216,7 +216,23 @@ function HS.tick()
         return
     end
     HS.points = headPoints(p, t)
-    if not HS.points then HS.phase = "failed"; log("head not readable"); return end
+    if not HS.points then
+        HS.phase = "failed"
+        log("head not readable")
+        -- developer log (2026-10-19: bone 6 read 0.137 m from the middle on every zombie on the ground, so it isn't
+        -- the head as the animation shows it): every bone's distance from the zombie's middle and from you, once,
+        -- to find which bone moves with the head
+        if ZA.dev then
+            local parts = {}
+            for b = 0, 45 do
+                local dz, dp = boneDist(t, t, b), boneDist(p, t, b)
+                table.insert(parts, b .. "=" .. (dz and string.format("%.2f", dz) or "-") .. "/" .. (dp and string.format("%.2f", dp) or "-"))
+            end
+            log(string.format("bones (from its middle / from you, %.2f m apart, fell on its %s): ", d,
+                (pcall(function() return t:isFallOnFront() end) and t:isFallOnFront()) and "front" or "back") .. table.concat(parts, " "))
+        end
+        return
+    end
     HS.try = 1
     HS.phase = "walking"
     ZA.urgent(ZA.tr("HeadStomp_Going"))
