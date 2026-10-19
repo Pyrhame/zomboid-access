@@ -1,7 +1,7 @@
 -- Zomboid Access: the grab cue. While a zombie is grabbing you (in its attack on you: the game's
 -- IsoZombie:isZombieAttacking), a button-mash alert plays
--- (za_grabbed.wav, Marc's choice 2026-10-18), and "Grabbed: L2 shoves it off, then R2" is said, at most every
--- 6 seconds. Works with or without lock-on. The sound is played again while the grab lasts, and stops once no
+-- (za_grabbed.wav), alone: no words since 2026-10-19 (the sound says it).
+-- Works with or without lock-on. The sound is played again while the grab lasts, and stops once no
 -- zombie has attacked you for a moment (a zombie's attacks come one after another, with short gaps).
 
 ZA.GR = ZA.GR or {}
@@ -59,11 +59,7 @@ function GR.tick()
         GR.lastSeen = now
         if not GR.on then
             GR.on = true
-            play(p)
-            if now - (GR.saidAt or 0) > 6000 then
-                GR.saidAt = now
-                ZA.urgent(ZA.tr("LockOn_Grabbed"))
-            end
+            play(p)     -- the sound alone: no words (Marc, 2026-10-19: the sound says it)
         elseif now - (GR.playedAt or 0) > GR.len then
             play(p)
         end

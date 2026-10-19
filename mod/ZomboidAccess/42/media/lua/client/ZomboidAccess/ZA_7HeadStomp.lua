@@ -2,7 +2,7 @@
 -- With lock-on on, when the zombie it is locked on to is on the ground within 2 metres, and no other zombie is
 -- standing within 3 metres, your character walks by itself to its head and faces it: a stomp (L2) or a swing
 -- there hits the head, which takes three times the damage (CombatManager.applyMeleeHitLocationDamage), while the
--- legs take almost none. "Going to its head", then "In place: L2 stomps". Touching the left stick stops the walk
+-- legs take almost none. The dodge cue as it goes (no words), then "In place: L2 stomps". Touching the left stick stops the walk
 -- (the game's own path action does it), and it all stops if the zombie gets up.
 --
 -- Where the head is: the game reads it from the skeleton (CombatManager.getBoneWorldPos), which mods can't call.
@@ -287,7 +287,7 @@ function HS.tick()
         getSoundManager():PlayWorldSoundImpl("ZA_HeadGo", false, math.floor(p:getX()), math.floor(p:getY()),
             math.floor(p:getZ()), 0, 40, 1, false)
     end)
-    ZA.urgent(ZA.tr("HeadStomp_Going"))
+    -- the cue alone: no words (Marc, 2026-10-19)
     walkTo(p, spotFor(t, HS.points[1].x, HS.points[1].y))
 end
 
