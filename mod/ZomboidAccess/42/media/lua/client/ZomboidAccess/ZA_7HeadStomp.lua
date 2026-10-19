@@ -170,7 +170,7 @@ function HS.tick()
     if HS.target and (t ~= HS.target or HS.target:isDead() or not down(HS.target)) then
         reset()
     end
-    if not t or not down(t) or t:isDead() then return end
+    if not t or not down(t) or t:isDead() then HS.settling = nil; return end
     local d = math.sqrt((t:getX() - p:getX()) ^ 2 + (t:getY() - p:getY()) ^ 2)
 
     if HS.phase == "walking" then
@@ -205,6 +205,22 @@ function HS.tick()
     local moving = false
     pcall(function() moving = p:isPlayerMoving() end)
     if moving or p:isPerformingAnAction() then return end
+
+    -- Still falling: the game calls it on the ground at once, but its body takes about a second to lie flat (in
+    -- game 2026-10-19, 0.2 s after the fall: head 0.14 m from its middle, legs still in the air). Wait until the
+    -- head lies away from the middle and stops moving, up to 3 seconds.
+    local now = getTimestampMs()
+    if HS.settling ~= t then HS.settling, HS.settleSince, HS.lastHead, HS.nextLook = t, now, nil, 0 end
+    if now < HS.nextLook then return end
+    HS.nextLook = now + 150
+    local mid = boneDist(t, t, HS.HEAD)
+    local settled = mid and mid >= 0.35 and HS.lastHead and math.abs(mid - HS.lastHead) < 0.03
+    HS.lastHead = mid
+    if not settled then
+        if now - HS.settleSince < 3000 then return end
+        log("never settled, head from middle " .. tostring(mid))
+    end
+    HS.settling = nil
 
     HS.target = t
     -- already at its head?

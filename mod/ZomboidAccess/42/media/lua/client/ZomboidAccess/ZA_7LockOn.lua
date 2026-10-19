@@ -73,10 +73,12 @@ end
 -- changes by a metre). Returns true when a weapon swing would reach it.
 local function proneGuide(p, t, fresh)
     -- ZA_7HeadStomp is taking you to its head, or has: it does the talking, and from its head you can strike
-    if ZA.HS and ZA.HS.handles and (ZA.HS.handles(t) or ZA.HS.wants(p, t)) then
+    if ZA.HS and ZA.HS.handles and ZA.HS.handles(t) then
         LK.proneState = nil
         return ZA.HS.phase == "placed"
     end
+    -- about to be taken over (it waits for the body to lie flat first): work out the reach, but say nothing
+    local quiet = ZA.HS and ZA.HS.wants and ZA.HS.wants(p, t)
     local d = dist(p, t)
     local reach = weaponReach(p)
     local state, canSwing
@@ -85,6 +87,7 @@ local function proneGuide(p, t, fresh)
     else state, canSwing = "far", false end
     local m = math.floor(d + 0.5)
     local now = getTimestampMs()
+    if quiet then return canSwing end
     if state ~= LK.proneState or (state == "far" and m ~= LK.proneMetres and now - (LK.proneSaidAt or 0) > 1500) then
         LK.proneState, LK.proneMetres, LK.proneSaidAt = state, m, now
         -- just locked on: after "Locked on: ...", not over it
