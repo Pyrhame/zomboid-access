@@ -281,6 +281,12 @@ function HS.tick()
     end
     HS.try = 1
     HS.phase, HS.startAt, HS.attacked = "walking", getTimestampMs(), false
+    -- a cue as the walk starts (Marc, 2026-10-19: WitcherAccess's dodge sound, plugin/sounds/dodge.wav), heard only
+    -- by you, so you know to hold your swings
+    pcall(function()
+        getSoundManager():PlayWorldSoundImpl("ZA_HeadGo", false, math.floor(p:getX()), math.floor(p:getY()),
+            math.floor(p:getZ()), 0, 40, 1, false)
+    end)
     ZA.urgent(ZA.tr("HeadStomp_Going"))
     walkTo(p, spotFor(t, HS.points[1].x, HS.points[1].y))
 end

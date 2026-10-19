@@ -72,6 +72,15 @@ module Base
             distanceMax = 40,
         }
     }
+    sound ZA_HeadGo
+    {
+        category = Object,
+        clip
+        {
+            file = media/sound/za_headgo.wav,
+            distanceMax = 40,
+        }
+    }
     sound ZA_Cooked
     {
         category = Object,
