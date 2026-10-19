@@ -258,6 +258,14 @@ function LK.tick()
     if hit then return end
     p:faceThisObject(t)
     if not bind then hold(p, false); return end
+    -- Out of reach on the ground, or being walked to its head: no aim held. With the aim held the game swings by
+    -- itself on R2, and those swings at the air cut the walk to the head (in game 2026-10-19: "Too far", then a
+    -- miss anyway, over and over, and the walk cut each time).
+    if not canSwing or (down and ZA.HS and ZA.HS.handles and ZA.HS.handles(t) and ZA.HS.phase ~= "placed") then
+        hold(p, false)
+        LK.swingUntil = nil
+        return
+    end
     hold(p, true)
     if pressed then LK.swingUntil = getTimestampMs() + 600 end
     swing(p)

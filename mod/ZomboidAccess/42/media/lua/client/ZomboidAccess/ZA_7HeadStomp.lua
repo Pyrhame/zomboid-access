@@ -235,6 +235,10 @@ function HS.tick()
     local moving = false
     pcall(function() moving = p:isPlayerMoving() end)
     if moving or p:isPerformingAnAction() then return end
+    -- not in the middle of a swing either: the walk would be cut at once
+    local swinging = false
+    pcall(function() swinging = p:isAttackStarted() end)
+    if swinging then return end
 
     -- Still falling: the game calls it on the ground at once, but its body takes about a second to lie flat (in
     -- game 2026-10-19, 0.2 s after the fall: head 0.14 m from its middle, legs still in the air). Wait until the
