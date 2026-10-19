@@ -191,6 +191,15 @@ end
 local origRelease = JoypadControllerData.onReleaseButton
 function JoypadControllerData:onReleaseButton(button)
     local jd = self.joypad
+    -- R1 held long enough for the game to start its R1 navigation (the press was slower than its delay): if the
+    -- navigation didn't move anywhere (still on the same list once it ends), it was a press of R1 meant for us
+    if jd and jd.isDoingNavigation and button == Joypad.RBumper then
+        local before = jd.currentNavigateUI
+        local r = origRelease(self, button)
+        ZA.log("[ZA] char create: R1 released while navigating, same list: " .. tostring(before ~= nil and before == jd.focus))
+        if before ~= nil and before == jd.focus and areaOf(jd.focus) then switch(jd, 1) end
+        return r
+    end
     if jd and not jd.isDoingNavigation and (button == Joypad.LBumper or button == Joypad.RBumper) and areaOf(jd.focus) then
         if switch(jd, button == Joypad.RBumper and 1 or -1) then return end
     end
