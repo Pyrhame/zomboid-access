@@ -1435,5 +1435,15 @@
     "UI_ZA_Alarm_IsOff": "alarm off",
     "UI_ZA_Alarm_Ok": "OK: keeps this setting and closes, {Cross}",
     "UI_ZA_Focus_Masked": "hidden, %1 characters",
+    "UI_ZA_Where_InCentre": "In the centre of %1",
+    "UI_ZA_Where_InPart": "In the %1 of %2, %3 metres from its centre",
+    "UI_ZA_Where_PartE": "east",
+    "UI_ZA_Where_PartNE": "north-east",
+    "UI_ZA_Where_PartN": "north",
+    "UI_ZA_Where_PartNW": "north-west",
+    "UI_ZA_Where_PartW": "west",
+    "UI_ZA_Where_PartSW": "south-west",
+    "UI_ZA_Where_PartS": "south",
+    "UI_ZA_Where_PartSE": "south-east",
     "UI_ZA_Core_DecimalSep": "."
 }

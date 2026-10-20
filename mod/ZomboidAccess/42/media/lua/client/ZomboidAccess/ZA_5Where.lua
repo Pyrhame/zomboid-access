@@ -81,7 +81,17 @@ local function townWords(px, py)
         if not bd or d < bd then best, bd = t, d end
     end
     if not best then return nil end
-    if bd < 700 then return ZA.tr("Where_In", best.name) end
+    if bd < 700 then
+        -- which part of the town (Marc, 2026-10-20: looking for where to settle, "Riverside" alone said too little):
+        -- by the compass from the town's middle (the middle of its spawn points, S.towns), as the guides and the
+        -- map talk about a town's quarters; the centre within 150 metres
+        if bd < 150 then return ZA.tr("Where_InCentre", best.name) end
+        local a = math.deg(math.atan2(-(py - best.y), px - best.x))   -- 0 = east, 90 = north (the map's y runs south)
+        local sector = math.floor(((a + 360 + 22.5) % 360) / 45)       -- 0 east, 1 north-east ... 7 south-east
+        local keys = { "Where_PartE", "Where_PartNE", "Where_PartN", "Where_PartNW", "Where_PartW", "Where_PartSW",
+            "Where_PartS", "Where_PartSE" }
+        return ZA.tr("Where_InPart", ZA.tr(keys[sector + 1]), best.name, math.floor(bd / 50 + 0.5) * 50)
+    end
     return ZA.tr("Where_Outside", best.name, S.where(best.x, best.y, 0, true))
 end
 
