@@ -323,7 +323,24 @@ end
 function RT.replan(v)
     local r = RT.route
     local tx, ty = S.entryPos(r.entry)
-    local pts, full = RT.plan(v:getX(), v:getY(), tx, ty, math.floor(v:getZ()))
+    local x, y, z = v:getX(), v:getY(), math.floor(v:getZ())
+    -- A far place is reached in stretches, each ending at the road square nearest it in what is loaded (the goal).
+    -- Keep heading for that goal until 40 m from it: chosen again from wherever the car is, two road ends about as
+    -- near the place swapped as the loaded area moved, and the car turned round again and again (2026-10-20,
+    -- "the route is behind you" every 25 seconds on the way to Fallas Lake).
+    local pts, full
+    if r.goalX and (r.goalX - x) ^ 2 + (r.goalY - y) ^ 2 > 40 * 40 then
+        pts, full = RT.plan(x, y, r.goalX, r.goalY, z)
+        if full then
+            full = false                         -- the goal is only a stretch of the way
+        else
+            r.goalX, r.goalY, pts = nil, nil, nil -- no longer reachable: choose again
+        end
+    end
+    if not pts then
+        pts, full = RT.plan(x, y, tx, ty, z)
+        if not full and #pts >= 2 then r.goalX, r.goalY = pts[#pts].x, pts[#pts].y else r.goalX, r.goalY = nil, nil end
+    end
     if #pts < 2 then return false end
     r.pts, r.full, r.i = pts, full, 1
     r.plannedAt = getTimestampMs()
