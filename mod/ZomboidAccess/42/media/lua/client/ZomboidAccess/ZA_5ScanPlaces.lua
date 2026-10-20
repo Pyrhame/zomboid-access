@@ -9,7 +9,10 @@ local S = ZA.S
 -- Room names -> what the building is, most telling first. Room names come from the map (seen in
 -- Muldraugh 2026-10-01: policeoffice, pharmacy, toolstore, gas2go, armysurplus...).
 local kinds = {   -- ids; the words are ScanPlaces_Kind_<id> and ScanPlaces_KindIn_<id> in the translations
-    "gunstore", "armysurplus", "police", "firestation", "hospital", "medical", "pharmacy", "hardware",
+    "gunstore", "armysurplus",
+    -- outdoor shops: the best places for a real backpack (loot tables CampingStoreBackpacks; added 2026-10-19)
+    "camping", "hunting", "outdoorsupply", "fishingstorage",
+    "police", "firestation", "hospital", "medical", "pharmacy", "hardware",
     "toolstore", "mechanic", "gas2go", "gasstore", "fossoil", "grocery", "cornerstore", "generalstore",
     "liquorstore", "warehouse", "farmstorage", "weldingworkshop", "electronicsstore", "clothesstore",
     "sportstore", "golfstore", "bookstore", "library", "comicstore", "candystore", "pawnshop", "movierental",
