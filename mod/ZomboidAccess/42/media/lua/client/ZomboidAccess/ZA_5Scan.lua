@@ -216,6 +216,12 @@ local function windowName(e)
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
     local c = curtainWords(o)
     if c then n = n .. ", " .. c end
+    -- which storey it is on, counted from the ground (Marc, 2026-10-19): nothing on the ground floor
+    local level = 0
+    pcall(function() level = math.floor(o:getZ()) end)
+    if level < 0 then n = n .. ", " .. ZA.tr("Scan_LevelBasement")
+    elseif level >= 1 and level <= 3 then n = n .. ", " .. ZA.tr("Scan_Level" .. level)
+    elseif level > 3 then n = n .. ", " .. ZA.tr("Scan_LevelN", level) end
     return n
 end
 

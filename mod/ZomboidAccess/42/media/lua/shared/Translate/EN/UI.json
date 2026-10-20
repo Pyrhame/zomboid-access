@@ -1229,5 +1229,10 @@
     "UI_ZA_ScanPlaces_Kind_fishingstorage": "Fishing shop",
     "UI_ZA_ScanPlaces_KindIn_fishingstorage": "in the Fishing shop",
     "UI_ZA_Scan_DoorOutside": "leads outside",
+    "UI_ZA_Scan_Level1": "first floor up",
+    "UI_ZA_Scan_Level2": "second floor up",
+    "UI_ZA_Scan_Level3": "third floor up",
+    "UI_ZA_Scan_LevelN": "floor %1 up",
+    "UI_ZA_Scan_LevelBasement": "in the basement",
     "UI_ZA_Core_DecimalSep": "."
 }

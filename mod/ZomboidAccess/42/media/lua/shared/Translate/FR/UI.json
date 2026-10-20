@@ -1229,5 +1229,10 @@
     "UI_ZA_ScanPlaces_Kind_fishingstorage": "Magasin de pêche",
     "UI_ZA_ScanPlaces_KindIn_fishingstorage": "dans le magasin de pêche",
     "UI_ZA_Scan_DoorOutside": "donne sur l'extérieur",
+    "UI_ZA_Scan_Level1": "au premier étage",
+    "UI_ZA_Scan_Level2": "au deuxième étage",
+    "UI_ZA_Scan_Level3": "au troisième étage",
+    "UI_ZA_Scan_LevelN": "au %1e étage",
+    "UI_ZA_Scan_LevelBasement": "au sous-sol",
     "UI_ZA_Core_DecimalSep": ","
 }
