@@ -196,7 +196,10 @@ function JoypadControllerData:onReleaseButton(button)
     if jd and jd.isDoingNavigation and button == Joypad.RBumper then
         local before = jd.currentNavigateUI
         local r = origRelease(self, button)
-        ZA.log("[ZA] char create: R1 released while navigating, same list: " .. tostring(before ~= nil and before == jd.focus))
+        -- (only on the character screen: R1 is held in game too, in the radio window for one)
+        if areaOf(before) then
+            ZA.log("[ZA] char create: R1 released while navigating, same list: " .. tostring(before == jd.focus))
+        end
         if before ~= nil and before == jd.focus and areaOf(jd.focus) then switch(jd, 1) end
         return r
     end

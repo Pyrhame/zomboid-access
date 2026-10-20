@@ -1237,5 +1237,14 @@
     "UI_ZA_Crouch_Down": "Crouched",
     "UI_ZA_Crouch_Up": "Standing",
     "UI_ZA_Scan_DoorWindow": "French door",
+    "UI_ZA_Radio_On": "on",
+    "UI_ZA_Radio_Off": "off",
+    "UI_ZA_Radio_Battery": "battery %1 percent",
+    "UI_ZA_Radio_Muted": "sound off",
+    "UI_ZA_Radio_Volume": "volume %1 of %2",
+    "UI_ZA_Radio_Channel": "channel: %1",
+    "UI_ZA_Radio_Folded": "folded",
+    "UI_ZA_Radio_UnfoldHint": "Right unfolds it",
+    "UI_ZA_Radio_WindowHint": "{R1}: into the settings, then Up and Down go from one to the next",
     "UI_ZA_Core_DecimalSep": "."
 }

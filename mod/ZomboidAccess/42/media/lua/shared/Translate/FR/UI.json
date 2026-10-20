@@ -1237,5 +1237,14 @@
     "UI_ZA_Crouch_Down": "Accroupi",
     "UI_ZA_Crouch_Up": "Debout",
     "UI_ZA_Scan_DoorWindow": "Porte-fenêtre",
+    "UI_ZA_Radio_On": "allumé",
+    "UI_ZA_Radio_Off": "éteint",
+    "UI_ZA_Radio_Battery": "pile à %1 pour cent",
+    "UI_ZA_Radio_Muted": "son coupé",
+    "UI_ZA_Radio_Volume": "volume %1 sur %2",
+    "UI_ZA_Radio_Channel": "chaîne : %1",
+    "UI_ZA_Radio_Folded": "replié",
+    "UI_ZA_Radio_UnfoldHint": "Droite le déplie",
+    "UI_ZA_Radio_WindowHint": "{R1} : entrer dans les réglages, puis Haut et Bas passent de l'un à l'autre",
     "UI_ZA_Core_DecimalSep": ","
 }
