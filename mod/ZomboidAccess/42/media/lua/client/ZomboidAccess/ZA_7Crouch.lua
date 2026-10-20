@@ -1,8 +1,8 @@
 -- Zomboid Access: says when the character crouches (sneaks) and when they stand up again (Marc, 2026-10-19).
 -- Only changes are spoken: nothing when the game loads, and nothing while dead or in a vehicle.
 
-ZA.CR = ZA.CR or {}
-local CR = ZA.CR
+ZA.Crouch = ZA.Crouch or {}   -- (not ZA.CR: that one is the craft menu, ZA_4Craft.lua)
+local CR = ZA.Crouch
 
 function CR.tick()
     local p = getPlayer()
