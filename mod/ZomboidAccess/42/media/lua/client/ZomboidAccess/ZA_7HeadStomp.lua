@@ -171,9 +171,20 @@ function HS.tick()
         return
     end
     local t = LK.target
-    -- the one being handled got up, died, changed, or lock-on let go: stop
-    if HS.target and (t ~= HS.target or HS.target:isDead() or not down(HS.target)) then
+    -- the one being handled got up, died, changed, or lock-on let go: stop. "Got up" only after 0.6 s off the ground:
+    -- a swing landing on it as the walk starts reads it off the ground for a moment (in game 2026-10-20: the walk
+    -- given up twice within a quarter of a second, each time just after "Hit, down", the zombie still lying there)
+    local up = false
+    if HS.target and not down(HS.target) then
+        HS.upSince = HS.upSince or getTimestampMs()
+        up = getTimestampMs() - HS.upSince > 600
+    else
+        HS.upSince = nil
+    end
+    if HS.target and (t ~= HS.target or HS.target:isDead() or up) then
+        if up then log("it got up") elseif t ~= HS.target then log("lock-on moved to another zombie") end
         reset()
+        HS.upSince = nil
     end
     if not t or not down(t) or t:isDead() then HS.settling = nil; return end
     local d = math.sqrt((t:getX() - p:getX()) ^ 2 + (t:getY() - p:getY()) ^ 2)
