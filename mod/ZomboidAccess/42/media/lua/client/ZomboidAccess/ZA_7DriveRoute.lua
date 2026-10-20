@@ -495,6 +495,14 @@ function RT.tick()
     if r.mode ~= "auto" then return end
 
     -- ---- autodrive ----
+    -- backing away from something it ran into (see "stuck" below): cruise control off meanwhile, then on again
+    if r.recoverUntil then
+        if t < r.recoverUntil then r.wantPush = true; RT.push(); return end
+        r.recoverUntil, r.slowSince = nil, nil
+        if r.speed and r.speed > 0 then setSpeed(v, r.speed); r.setAt = t end
+        ZA.log("[ZA] autodrive: backed away, on again")
+        return
+    end
     -- the player braked or reversed: the game switched cruise control off; the car is theirs
     if r.speed and r.speed > 0 and not r.stopping and not v:isRegulator() and t - (r.setAt or 0) > 500 then
         RT.stop(false, ZA.tr("Route_AutoOff"))
@@ -516,8 +524,18 @@ function RT.tick()
     if not isGamePaused() and math.abs(speed) < 2 and r.speed and r.speed > 0 then
         r.slowSince = r.slowSince or t
         -- (turning round on the spot is slow on purpose: give it longer)
-        local limit = (r.pivotAt and t - r.pivotAt < 500) and 10000 or 3000
-        if t - r.slowSince > limit then RT.stop(false, ZA.tr("Route_Stuck")); return end
+        local limit = (r.pivotAt and t - r.pivotAt < 500) and 10000 or 1500
+        if t - r.slowSince > limit then
+            -- Ran into something (a tree beside the way, 2026-10-20, twice): back away for a second and a half,
+            -- turning towards the route, then go on; three tries, then it's yours.
+            r.recovers = (r.recovers or 0) + 1
+            if r.recovers > 3 then RT.stop(false, ZA.tr("Route_Stuck")); return end
+            v:setRegulator(false)
+            r.recoverUntil, r.slowSince = t + 1500, nil
+            if r.recovers == 1 then ZA.say(ZA.tr("Route_BackingAway")) end
+            ZA.log("[ZA] autodrive: stuck, backing away (" .. r.recovers .. ")")
+            return
+        end
     else
         r.slowSince = nil
     end
@@ -674,6 +692,21 @@ function RT.push()
     if not v or not r.steer then return end
     local t = getTimestampMs()
     local speed = v:getCurrentSpeedKmHour()
+    -- backing away: a push straight back (one per physics step, like the steering), and the body turned towards
+    -- the route if that works here (RT.cal.sign)
+    if r.recoverUntil then
+        local bx, by = heading(v)
+        v:addImpulse(Vector3f.new(-bx * 700, 0, -by * 700), Vector3f.new(0, 0, 0))
+        if RT.cal.sign and RT.steerMode == "yaw" then
+            local dt = math.min(0.1, (t - (r.backT or t)) / 1000)
+            r.backT = t
+            local px, py = along(r, r.i or 1, 6)
+            local a = bearing(v, px, py)
+            if math.abs(a) > 10 then turnBody(v, (a > 0 and 1 or -1) * 30 * dt * RT.cal.sign) end
+        end
+        return
+    end
+    r.backT = nil
     if RT.steerMode == "yaw" and pushYaw(r, v, speed) then return end
     local hx, hy = heading(v)
     local hNow = math.deg(math.atan2(hy, hx))
