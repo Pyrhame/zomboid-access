@@ -3,7 +3,8 @@
 -- standing within 3 metres, your character walks by itself to its head and faces it: a stomp (L2) or a swing
 -- there hits the head, which takes three times the damage (CombatManager.applyMeleeHitLocationDamage), while the
 -- legs take almost none. The dodge cue as it goes (no words), then "In place: L2 stomps". Touching the left stick stops the walk
--- (the game's own path action does it), and it all stops if the zombie gets up.
+-- (the game's own path action does it), and it all stops if the zombie gets up. RT and LT do nothing during the walk
+-- (HS.syncBan), so a reflex swing doesn't cut it; a zombie standing up close stops the walk and gives them back.
 --
 -- Where the head is: the game reads it from the skeleton (CombatManager.getBoneWorldPos), which mods can't call.
 -- But IsoGameCharacter:DoSwingCollisionBoneCheck(zombie, bone, r), which mods can call, says whether that bone of
@@ -24,6 +25,7 @@ HS.trigger = 2.0     -- metres: a zombie on the ground this close sends you to i
 HS.clear = 3.0       -- metres: no other zombie standing this close
 HS.beyond = 0.35     -- metres: where you stand, past the head on the side away from the body
 HS.placed = 0.55     -- metres: head this close to you counts as in place (the stomp reaches under 0.6)
+HS.maxWalk = 8000    -- ms: a walk to a head that takes longer than this is given up
 
 local function log(t) ZA.log("[ZA] head stomp: " .. t) end
 
@@ -175,6 +177,16 @@ function HS.tick()
     if not t or not down(t) or t:isDead() then HS.settling = nil; return end
     local d = math.sqrt((t:getX() - p:getX()) ^ 2 + (t:getY() - p:getY()) ^ 2)
 
+    -- your swings are held back during the walk (see HS.syncBan): so if a zombie gets up close to you meanwhile, or
+    -- the walk drags on, stop it and give your swings back
+    if (HS.phase == "walking" or HS.phase == "retry")
+        and (standingNear(p, t) or getTimestampMs() - (HS.startAt or 0) > HS.maxWalk) then
+        log("walk stopped: a zombie standing close, or too long")
+        stopWalk()
+        HS.phase = "stopped"
+        return
+    end
+
     if HS.phase == "walking" then
         local pushed = false
         pcall(function() pushed = p:pressedMovement(false) end)
@@ -295,10 +307,35 @@ function HS.tick()
     walkTo(p, spotFor(t, HS.points[1].x, HS.points[1].y))
 end
 
+-- While walking to a head, RT and LT do nothing (Marc, 2026-10-19: in game every RT press cut the walk, four times in
+-- a row, and the zombie was never reached): the game's own switch, IsoPlayer:setBannedAttacking, the one it uses
+-- while the inventory or the map is open, stops swings, shoves and stomps. It is let go as soon as the walk is over
+-- (in place, failed, stopped, the zombie got up, lock-on off...), and only if this module was the one that set it.
+function HS.syncBan()
+    local p = getPlayer()
+    local want = p ~= nil and not p:isDead() and (HS.phase == "walking" or HS.phase == "retry")
+    if want and not HS.banned then
+        if not p:isBannedAttacking() then
+            p:setBannedAttacking(true)
+            HS.banned = true
+            log("swings held back during the walk")
+        end
+    elseif not want and HS.banned then
+        HS.banned = false
+        if p and p:isBannedAttacking() then p:setBannedAttacking(false) end
+        log("swings given back")
+    end
+end
+
+function HS.frame()
+    local ok, err = pcall(HS.tick)
+    if not ok and not HS.errSaid then HS.errSaid = true; print("[ZA] head stomp error: " .. tostring(err)) end
+    -- after the tick whatever happened in it, an error too: swings must never stay held back
+    local ok2, err2 = pcall(HS.syncBan)
+    if not ok2 and not HS.banErrSaid then HS.banErrSaid = true; print("[ZA] head stomp ban error: " .. tostring(err2)) end
+end
+
 if not HS.ticking then
     HS.ticking = true
-    ZA.onTick(function()
-        local ok, err = pcall(HS.tick)
-        if not ok and not HS.errSaid then HS.errSaid = true; print("[ZA] head stomp error: " .. tostring(err)) end
-    end)
+    ZA.onTick(function() HS.frame() end)   -- looked up each frame, so a reload of this file takes effect
 end
