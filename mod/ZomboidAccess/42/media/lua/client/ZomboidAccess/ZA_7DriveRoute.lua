@@ -499,6 +499,7 @@ function RT.tick()
     if r.recoverUntil then
         if t < r.recoverUntil then r.wantPush = true; RT.push(); return end
         r.recoverUntil, r.slowSince = nil, nil
+        pcall(RT.replan, v)
         if r.speed and r.speed > 0 then setSpeed(v, r.speed); r.setAt = t end
         ZA.log("[ZA] autodrive: backed away, on again")
         return
@@ -526,12 +527,16 @@ function RT.tick()
         -- (turning round on the spot is slow on purpose: give it longer)
         local limit = (r.pivotAt and t - r.pivotAt < 500) and 10000 or 1500
         if t - r.slowSince > limit then
-            -- Ran into something (a tree beside the way, 2026-10-20, twice): back away for a second and a half,
-            -- turning towards the route, then go on; three tries, then it's yours.
+            -- Ran into something (a tree beside the way, 2026-10-20, twice). A car at rest can't be pushed back:
+            -- the game holds its wheels (in game 2026-10-20: a push of 2500 for 1.5 s moved it 2 cm). So turn it on
+            -- the spot, 50 degrees towards the freer side, then plan again from there and go on; three tries, then
+            -- it's yours.
             r.recovers = (r.recovers or 0) + 1
             if r.recovers > 3 then RT.stop(false, ZA.tr("Route_Stuck")); return end
             v:setRegulator(false)
             r.recoverUntil, r.slowSince = t + 1500, nil
+            r.turnSide = RT.freerSide(v)
+            r.turned = 0
             if r.recovers == 1 then ZA.say(ZA.tr("Route_BackingAway")) end
             ZA.log("[ZA] autodrive: stuck, backing away (" .. r.recovers .. ")")
             return
@@ -643,6 +648,30 @@ end
 -- So the push steers the driving; the body is turned only when the route is behind the car, or well to the side
 -- while it is barely moving, where a car can't steer its way round and speed doesn't matter.
 -- Returns true when it handled the frame (the push then does nothing).
+-- Which side is freer ahead of the car: +1 right, -1 left (trees, walls and cars counted 2 to 4 squares out,
+-- 45 degrees to each side).
+function RT.freerSide(v)
+    local hx, hy = heading(v)
+    local z = math.floor(v:getZ())
+    local cell = getCell()
+    local function count(side)
+        local c = 0
+        local a = math.rad(45 * side)
+        local dx, dy = hx * math.cos(a) - hy * math.sin(a), hx * math.sin(a) + hy * math.cos(a)
+        for d = 2, 4 do
+            local sq = cell:getGridSquare(math.floor(v:getX() + dx * d), math.floor(v:getY() + dy * d), z)
+            if not sq then c = c + 1
+            else
+                if blockedSq(sq) then c = c + 1 end
+                local objs = sq:getObjects()
+                for i = 0, objs:size() - 1 do if instanceof(objs:get(i), "IsoTree") then c = c + 1; break end end
+            end
+        end
+        return c
+    end
+    return count(1) <= count(-1) and 1 or -1
+end
+
 local function pushYaw(r, v, speed)
     local t = getTimestampMs()
     local dt = (t - (r.yawT or t)) / 1000
@@ -692,17 +721,26 @@ function RT.push()
     if not v or not r.steer then return end
     local t = getTimestampMs()
     local speed = v:getCurrentSpeedKmHour()
-    -- backing away: a push straight back (one per physics step, like the steering), and the body turned towards
-    -- the route if that works here (RT.cal.sign)
+    -- getting free: the body turned on the spot towards the freer side, 50 degrees at 45 a second (see "stuck")
     if r.recoverUntil then
-        local bx, by = heading(v)
-        v:addImpulse(Vector3f.new(-bx * 700, 0, -by * 700), Vector3f.new(0, 0, 0))
-        if RT.cal.sign and RT.steerMode == "yaw" then
-            local dt = math.min(0.1, (t - (r.backT or t)) / 1000)
-            r.backT = t
-            local px, py = along(r, r.i or 1, 6)
-            local a = bearing(v, px, py)
-            if math.abs(a) > 10 then turnBody(v, (a > 0 and 1 or -1) * 30 * dt * RT.cal.sign) end
+        if RT.steerMode ~= "yaw" then return end
+        local C = RT.cal
+        if not C.sign then
+            -- which way the angle turns the car (as in pushYaw)
+            if not C.at then C.hx, C.hy = heading(v); C.at = t; turnBody(v, 3, true); return end
+            if t - C.at < 200 then return end
+            local hx, hy = heading(v)
+            local cross = C.hx * hy - C.hy * hx
+            C.at = nil
+            if math.abs(cross) < 0.02 then RT.steerMode = "push"; C.failed = true; return end
+            C.sign = cross > 0 and 1 or -1
+        end
+        local dt = math.min(0.1, (t - (r.backT or t)) / 1000)
+        r.backT = t
+        if (r.turned or 0) < 50 then
+            local step = 45 * dt
+            r.turned = (r.turned or 0) + step
+            turnBody(v, (r.turnSide or 1) * step * C.sign)
         end
         return
     end

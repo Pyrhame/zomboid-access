@@ -1446,6 +1446,6 @@
     "UI_ZA_Where_PartS": "south",
     "UI_ZA_Where_PartSE": "south-east",
     "UI_ZA_Route_GoingRound": "Something on the road: going round it",
-    "UI_ZA_Route_BackingAway": "Stuck: backing away",
+    "UI_ZA_Route_BackingAway": "Stuck: turning to get free",
     "UI_ZA_Core_DecimalSep": "."
 }

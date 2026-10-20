@@ -1446,6 +1446,6 @@
     "UI_ZA_Where_PartS": "sud",
     "UI_ZA_Where_PartSE": "sud-est",
     "UI_ZA_Route_GoingRound": "Obstacle sur la route : je le contourne",
-    "UI_ZA_Route_BackingAway": "Bloqué : je recule",
+    "UI_ZA_Route_BackingAway": "Bloqué : je tourne pour me dégager",
     "UI_ZA_Core_DecimalSep": ","
 }
