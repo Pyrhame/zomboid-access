@@ -45,12 +45,10 @@ local function usable(p, z)
 end
 
 -- ---------- a zombie on the ground ----------
--- The game hits a zombie on the ground only within the weapon's reach (its range times the character's range bonus,
--- as CombatManager.calcValidTargets), and the stomp (L2) aims at the ground only from under 0.6 metres
--- (CombatManager.calculateAttackVars). These are measured to the zombie's nearest body part; we only know its
--- middle, so a little is allowed for its body.
-LK.proneBody = 0.5      -- metres from its middle to its nearest part, about
-LK.stompAt = 0.6 + 0.5  -- stomp distance, from its middle
+-- On the ground it's the stomp (L2): the game aims a stomp at the ground only when the zombie's nearest body part is
+-- under 0.6 metres (CombatManager.calculateAttackVars). Lock-on holds no aim and swings nothing at a zombie on the
+-- ground (see proneGuide).
+LK.stompAt = 0.6 + 0.5  -- stomp distance from its middle, when its skeleton can't be read
 
 local function prone(z)
     local down = false
@@ -58,33 +56,38 @@ local function prone(z)
     return down
 end
 
--- The reach of the weapon in your hands, nil with bare hands or a gun (then only the stomp reaches the ground).
-local function weaponReach(p)
-    local reach = nil
-    pcall(function()
-        local w = p:getPrimaryHandItem()
-        if w and instanceof(w, "HandWeapon") and not w:isRanged() then reach = w:getMaxRange() * w:getRangeMod(p) end
-    end)
-    return reach
-end
-
--- Says where a zombie on the ground is and what you can do: "Down, get closer: 2 metres right", then "On the
--- ground, in reach: R2 hits", then "Right on it: L2 stomps". Each said when it changes (the distance again when it
--- changes by a metre). Returns true when a weapon swing would reach it.
+-- Says where a zombie on the ground is and what to do: "Down, get closer: 2 metres right", then "Right on it: L2
+-- stomps". Each said when it changes (the distance again when it changes by a metre). Returns false: no swing.
 local function proneGuide(p, t, fresh)
     -- ZA_7HeadStomp is taking you to its head, or has: it does the talking, and from its head you can strike
     if ZA.HS and ZA.HS.handles and ZA.HS.handles(t) then
         LK.proneState = nil
-        return ZA.HS.phase == "placed"
+        return false
     end
     -- about to be taken over (it waits for the body to lie flat first): work out the reach, but say nothing
     local quiet = ZA.HS and ZA.HS.wants and ZA.HS.wants(p, t)
     local d = dist(p, t)
-    local reach = weaponReach(p)
+    -- On the ground it's the stomp (L2), from close by: the game stomps on the ground only when the zombie's
+    -- nearest part is under 0.6 m (CombatManager.calculateAttackVars), measured here on its skeleton as the game
+    -- does (ZA_7HeadStomp's boneDist: head, spine, calves, feet), else from its middle with a body's allowance.
+    -- No swing with R2 any more on the ground (2026-10-19, in game: R2 at a zombie on the ground with the aim held
+    -- left the character stuck in its swing, unable to move).
+    local near = nil
+    local now0 = getTimestampMs()
+    if LK.nearFor == t and now0 < (LK.nearUntil or 0) then
+        near = LK.near
+    elseif ZA.HS and ZA.HS.boneDist then
+        for _, b in ipairs({ 6, 3, 21, 25, 22, 26 }) do
+            local v = ZA.HS.boneDist(p, t, b)
+            if v and (not near or v < near) then near = v end
+        end
+        LK.near, LK.nearFor, LK.nearUntil = near, t, now0 + 150   -- measured at most every 0.15 s
+    end
+    -- a little slack to leave "close" once there, so a zombie sliding on the floor doesn't flip it back and forth
+    local edge = (LK.proneState == "stomp") and 0.7 or 0.6
+    local close = near and near < edge or (not near and d <= LK.stompAt)
     local state, canSwing
-    if d <= LK.stompAt then state, canSwing = "stomp", true   -- with bare hands R2 shoves, which stomps from there
-    elseif reach and d <= reach + LK.proneBody then state, canSwing = "reach", true
-    else state, canSwing = "far", false end
+    if close then state, canSwing = "stomp", false else state, canSwing = "far", false end
     local m = math.floor(d + 0.5)
     local now = getTimestampMs()
     if quiet then return canSwing end
@@ -93,7 +96,6 @@ local function proneGuide(p, t, fresh)
         -- just locked on: after "Locked on: ...", not over it
         local say = fresh and ZA.queue or ZA.urgent
         if state == "stomp" then say(ZA.tr("LockOn_ProneStomp"))
-        elseif state == "reach" then say(ZA.tr("LockOn_ProneReach"))
         else say(ZA.tr("LockOn_ProneFar", (S.where(t:getX(), t:getY(), t:getZ())))) end
     end
     return canSwing
@@ -249,7 +251,12 @@ function LK.tick()
     if pressed and not canSwing then
         pressed = false
         local now = getTimestampMs()
-        if now - (LK.tooFarAt or 0) > 1500 then LK.tooFarAt = now; ZA.urgent(ZA.tr("LockOn_TooFar")) end
+        if now - (LK.tooFarAt or 0) > 1500 then
+            LK.tooFarAt = now
+            -- on the ground and close enough: it's L2 that stomps; else still too far
+            local placed = ZA.HS and ZA.HS.handles and ZA.HS.handles(t) and ZA.HS.phase == "placed"
+            ZA.urgent(ZA.tr((LK.proneState == "stomp" or placed) and "LockOn_ProneStomp" or "LockOn_TooFar"))
+        end
     end
     -- Bitten or hit: the game drops your aim and won't let you swing until it's over. A shove breaks a grab.
     local hit = false
