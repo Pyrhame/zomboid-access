@@ -374,10 +374,29 @@ end
 function RT.tick()
     local r = RT.route
     if not r then return end
+    -- paused (the pause menu, a menu that pauses): nothing at all, and the drive goes on as you come back (Marc,
+    -- 2026-10-20: the pause read as "stuck" and stopped it). The clocks restart so the pause counts for nothing.
+    if isGamePaused() then
+        r.pausedAt = r.pausedAt or getTimestampMs()
+        return
+    end
+    if r.pausedAt then
+        local gap = getTimestampMs() - r.pausedAt
+        r.pausedAt, r.slowSince = nil, nil
+        r.plannedAt = (r.plannedAt or 0) + gap
+        r.setAt = (r.setAt or 0) + gap
+        r.yawT = nil
+        r.reassert = true
+    end
     local p = getPlayer()
     local v = p and p:getVehicle()
     if not v or not v:isDriver(p) then RT.stop(true); return end
     local t = getTimestampMs()
+    -- back from a pause: the cruise control on again at the speed it had (in case the pause let go of it)
+    if r.reassert then
+        r.reassert = nil
+        if r.mode == "auto" and r.speed and r.speed > 0 then setSpeed(v, r.speed); r.setAt = t end
+    end
     local tx, ty = S.entryPos(r.entry)
     local dEnd = math.sqrt((tx - v:getX()) ^ 2 + (ty - v:getY()) ^ 2)
     local speed = v:getCurrentSpeedKmHour()
@@ -449,7 +468,7 @@ function RT.tick()
     end
     -- speed: by how sharp the road ahead turns, so the car is slow BEFORE the bend (2026-10-20: it hit walls at
     -- junctions, still at 20 km/h in the turn); slower near zombies and near the end
-    local want = RT.cruise or (RT.steerMode == "yaw" and 30 or 20)
+    local want = RT.cruise or 20
     local sharp, sharpAt = sharpAhead(r, i, 35)
     if sharp >= 70 then want = math.min(want, (sharpAt or 0) < 15 and 8 or 12)
     elseif sharp >= 40 then want = math.min(want, (sharpAt or 0) < 15 and 12 or 15)
@@ -459,7 +478,8 @@ function RT.tick()
     if math.abs(r.steer) > 100 then want = math.min(want, 5) end   -- turning round
     if dEnd < 40 then want = math.min(want, 15) end
     -- stuck: cruise control on, barely moving for 3 seconds (against a wall, in a ditch): stop and say so
-    if math.abs(speed) < 2 and r.speed and r.speed > 0 then
+    if isGamePaused() then r.slowSince = nil end   -- (not stuck: paused)
+    if not isGamePaused() and math.abs(speed) < 2 and r.speed and r.speed > 0 then
         r.slowSince = r.slowSince or t
         -- (turning round on the spot is slow on purpose: give it longer)
         local limit = (r.pivotAt and t - r.pivotAt < 500) and 10000 or 3000
@@ -565,62 +585,49 @@ local function turnBody(v, deg, now)
     end
 end
 
+-- Turning the body is now only for turning round on the spot. On the move it held the car back: each turn puts the
+-- car where the physics last had it and seems to take its speed (2026-10-20, in game: 0 to 3 km/h for a cruise
+-- control of 30 on a straight road, rising and falling back each time it turned, while the push alone reached 7).
+-- So the push steers the driving; the body is turned only when the route is behind the car, or well to the side
+-- while it is barely moving, where a car can't steer its way round and speed doesn't matter.
+-- Returns true when it handled the frame (the push then does nothing).
 local function pushYaw(r, v, speed)
     local t = getTimestampMs()
     local dt = (t - (r.yawT or t)) / 1000
     r.yawT = t
-    if dt <= 0 then return true end
     if dt > 0.1 then dt = 0.1 end
     local ms = speed / 3.6
+    local look = math.max(4, math.min(12, 3 + ms * 0.7))
+    local px, py = along(r, r.i or 1, look)
+    local a = math.rad(bearing(v, px, py))          -- + = to the right
+    local pivot = math.abs(a) >= math.rad(100) or (ms < 2 and math.abs(a) >= math.rad(50))
+    if not pivot then return false end
+    r.pivotAt = t
+    if dt <= 0 then return true end
     local C = RT.cal
-    -- the check needs the car really moving forward: at walking pace, or backing out, the tyres hold it
-    -- (2026-10-20: checked at 0.8 m/s with the route behind, failed, and the drive went on with the push);
-    -- until then the push steers (false: not handled here)
-    if not C.sign and ms < 2 then return false end
     if not C.sign then
-        -- which way, and does it keep the speed: turn 3 degrees, look again 0.2 s later
+        -- which way the angle turns the car: turn 3 degrees, look again 0.2 s later (no speed needed)
         if not C.at then
             C.hx, C.hy = heading(v)
-            C.ms, C.at = ms, t
+            C.at = t
             turnBody(v, 3, true)
             return true
         end
         if t - C.at < 200 then return true end
         local hx, hy = heading(v)
         local cross = C.hx * hy - C.hy * hx   -- + = the car turned right (clockwise on the map)
-        local ms2 = v:getCurrentSpeedKmHour() / 3.6
         C.at = nil
-        if math.abs(cross) < 0.02 or ms2 < C.ms * 0.6 then
+        if math.abs(cross) < 0.02 then
             RT.steerMode = "push"
             C.failed = true
-            ZA.log(string.format("[ZA] autodrive: turning the body doesn't work (turned %.3f, speed %.1f -> %.1f m/s), back to the push",
-                cross, C.ms, ms2))
+            ZA.log(string.format("[ZA] autodrive: turning the body doesn't work (turned %.3f), push only", cross))
             return false
         end
         C.sign = cross > 0 and 1 or -1
-        ZA.log(string.format("[ZA] autodrive: turning the body works (sign %d, speed %.1f -> %.1f m/s)", C.sign, C.ms, ms2))
+        ZA.log("[ZA] autodrive: turning the body works (sign " .. C.sign .. ")")
     end
-    -- pure pursuit: aim at a point a little ahead, nearer when slow (tight turns), further when fast (smooth)
-    local look = math.max(4, math.min(12, 3 + ms * 0.7))   -- (shorter overshoots a square corner: a car turns no tighter than 5 m)
-    local px, py = along(r, r.i or 1, look)
-    local a = math.rad(bearing(v, px, py))          -- + = to the right
-    local w
-    if math.abs(a) >= math.rad(100) or (ms < 2 and math.abs(a) >= math.rad(50)) then
-        -- the route is behind, or well to the side while barely moving (a drive starting the wrong way or across
-        -- the road, 2026-10-20: the car crept into a wall, then sat at 1 km/h with the route at 95 degrees): turn
-        -- round on the spot, 40 degrees a second, whatever the speed; the cruise control holds it to a crawl
-        w = (a > 0 and 1 or -1) * 0.7
-        r.pivotAt = t
-    elseif ms < 0.8 then
-        return true                                  -- (also not backwards)
-    elseif math.abs(a) >= math.pi / 2 then
-        w = (a > 0 and 1 or -1) * ms / RT.rMin       -- beside you: as tight as a car can
-    else
-        w = ms * 2 * math.sin(a) / look              -- radians a second, + = right
-        local wMax = ms / RT.rMin
-        if w > wMax then w = wMax elseif w < -wMax then w = -wMax end
-    end
-    if w > 1.6 then w = 1.6 elseif w < -1.6 then w = -1.6 end
+    -- 40 degrees a second towards the route; the cruise control holds the car to a crawl meanwhile
+    local w = (a > 0 and 1 or -1) * 0.7
     turnBody(v, math.deg(w * dt) * C.sign)
     return true
 end
