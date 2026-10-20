@@ -1234,5 +1234,7 @@
     "UI_ZA_Scan_Level3": "au troisième étage",
     "UI_ZA_Scan_LevelN": "au %1e étage",
     "UI_ZA_Scan_LevelBasement": "au sous-sol",
+    "UI_ZA_Crouch_Down": "Accroupi",
+    "UI_ZA_Crouch_Up": "Debout",
     "UI_ZA_Core_DecimalSep": ","
 }

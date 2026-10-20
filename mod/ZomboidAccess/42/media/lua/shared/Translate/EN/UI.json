@@ -1234,5 +1234,7 @@
     "UI_ZA_Scan_Level3": "third floor up",
     "UI_ZA_Scan_LevelN": "floor %1 up",
     "UI_ZA_Scan_LevelBasement": "in the basement",
+    "UI_ZA_Crouch_Down": "Crouched",
+    "UI_ZA_Crouch_Up": "Standing",
     "UI_ZA_Core_DecimalSep": "."
 }
