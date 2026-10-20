@@ -1209,7 +1209,6 @@
     "UI_ZA_Menus_HintSub": "Up and Down choose, {Cross} does it, Left goes back",
     "UI_ZA_Scan_CurtainsOpen": "curtains open",
     "UI_ZA_Scan_CurtainsClosed": "curtains closed",
-    "UI_ZA_Scan_NoCurtains": "no curtains",
     "UI_ZA_Menus_TeachesKnown": "you already know them",
     "UI_ZA_Status_Exclaim": "%1!",
     "UI_ZA_Menus_FluidAmountOne": "%1, %2 litre",
@@ -1221,5 +1220,14 @@
     "UI_ZA_HeadStomp_Going": "Going to its head, wait",
     "UI_ZA_HeadStomp_Placed": "In place: {L2} stomps the head",
     "UI_ZA_HeadStomp_Failed": "Can't get to its head",
+    "UI_ZA_ScanPlaces_Kind_camping": "Camping shop",
+    "UI_ZA_ScanPlaces_KindIn_camping": "in the Camping shop",
+    "UI_ZA_ScanPlaces_Kind_hunting": "Hunting shop",
+    "UI_ZA_ScanPlaces_KindIn_hunting": "in the Hunting shop",
+    "UI_ZA_ScanPlaces_Kind_outdoorsupply": "Outdoor supply shop",
+    "UI_ZA_ScanPlaces_KindIn_outdoorsupply": "in the Outdoor supply shop",
+    "UI_ZA_ScanPlaces_Kind_fishingstorage": "Fishing shop",
+    "UI_ZA_ScanPlaces_KindIn_fishingstorage": "in the Fishing shop",
+    "UI_ZA_Scan_DoorOutside": "leads outside",
     "UI_ZA_Core_DecimalSep": "."
 }

@@ -163,10 +163,11 @@ local function objKey(o, x, y, z)
 end
 
 -- Curtains (or a sheet hung up): what hides you and your light from outside. Read as the game does (ISZoneDisplay).
+-- Nothing said when there are none (Marc, 2026-10-19: "no curtains" told him nothing).
 local function curtainWords(o)
     local curtains = nil
     pcall(function() curtains = o:HasCurtains() end)
-    if not curtains then return ZA.tr("Scan_NoCurtains") end
+    if not curtains then return nil end
     local cOpen = false
     pcall(function() cOpen = curtains:IsOpen() end)
     return ZA.tr(cOpen and "Scan_CurtainsOpen" or "Scan_CurtainsClosed")
@@ -191,7 +192,14 @@ local function doorName(e)
     local barr = false
     pcall(function() barr = o:isBarricaded() end)
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
-    if instanceof(o, "IsoDoor") and glassDoor(o) then n = n .. ", " .. curtainWords(o) end
+    if instanceof(o, "IsoDoor") then
+        -- a door between a building and the outside (IsoDoor:isExterior, the game's own test; Marc, 2026-10-19)
+        local outside = false
+        pcall(function() outside = o:isExterior() end)
+        if outside then n = n .. ", " .. ZA.tr("Scan_DoorOutside") end
+        local c = glassDoor(o) and curtainWords(o)
+        if c then n = n .. ", " .. c end
+    end
     return n
 end
 
@@ -206,7 +214,9 @@ local function windowName(e)
     elseif open then n = n .. ", " .. ZA.tr("Scan_Open")
     else n = n .. ", " .. ZA.tr("Scan_Closed") end
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
-    return n .. ", " .. curtainWords(o)
+    local c = curtainWords(o)
+    if c then n = n .. ", " .. c end
+    return n
 end
 
 local function switchName(e)

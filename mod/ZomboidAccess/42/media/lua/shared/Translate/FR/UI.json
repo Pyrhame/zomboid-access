@@ -1209,7 +1209,6 @@
     "UI_ZA_Menus_HintSub": "Haut et bas choisissent, {Cross} valide, gauche revient en arrière",
     "UI_ZA_Scan_CurtainsOpen": "rideaux ouverts",
     "UI_ZA_Scan_CurtainsClosed": "rideaux fermés",
-    "UI_ZA_Scan_NoCurtains": "sans rideaux",
     "UI_ZA_Menus_TeachesKnown": "tu les connais déjà",
     "UI_ZA_Status_Exclaim": "%1 !",
     "UI_ZA_Menus_FluidAmountOne": "%1, %2 litre",
@@ -1221,5 +1220,14 @@
     "UI_ZA_HeadStomp_Going": "Je me place à sa tête, attends",
     "UI_ZA_HeadStomp_Placed": "En place : {L2} pour écraser la tête",
     "UI_ZA_HeadStomp_Failed": "Impossible d'atteindre sa tête",
+    "UI_ZA_ScanPlaces_Kind_camping": "Magasin de camping",
+    "UI_ZA_ScanPlaces_KindIn_camping": "dans le magasin de camping",
+    "UI_ZA_ScanPlaces_Kind_hunting": "Magasin de chasse",
+    "UI_ZA_ScanPlaces_KindIn_hunting": "dans le magasin de chasse",
+    "UI_ZA_ScanPlaces_Kind_outdoorsupply": "Magasin de plein air",
+    "UI_ZA_ScanPlaces_KindIn_outdoorsupply": "dans le magasin de plein air",
+    "UI_ZA_ScanPlaces_Kind_fishingstorage": "Magasin de pêche",
+    "UI_ZA_ScanPlaces_KindIn_fishingstorage": "dans le magasin de pêche",
+    "UI_ZA_Scan_DoorOutside": "donne sur l'extérieur",
     "UI_ZA_Core_DecimalSep": ","
 }
