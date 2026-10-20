@@ -105,6 +105,10 @@ function F.describeBare(ui)
         return ZA.tr("Focus_Volume", v), ZA.tr("Focus_VolumeValue", v)
     elseif t == "ISTextEntryBox" then
         local v = ui:getText() or ""
+        -- a password box: never its text, only how long it is (2026-10-20, the multiplayer forms)
+        local masked = false
+        pcall(function() masked = ui:isMasked() == true end)
+        if masked then v = ZA.tr("Focus_Masked", #v) end
         return ZA.tr("Focus_EditBox", v == "" and ZA.tr("Focus_Empty") or v), v
     elseif ui.getCurrentValue then
         local v = ZA.tr("Focus_Slider", tostring(ui:getCurrentValue()))

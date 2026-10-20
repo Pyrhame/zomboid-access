@@ -19,7 +19,8 @@ local AREAS = {
 
 local function screen(panel)
     local p = panel and panel.parent
-    if p and p.Type == "CharacterCreationProfession" then return p end
+    -- (the same screen for a second player joining a server: CoopCharacterCreationProfession.lua:3)
+    if p and (p.Type == "CharacterCreationProfession" or p.Type == "CoopCharacterCreationProfession") then return p end
     return nil
 end
 
