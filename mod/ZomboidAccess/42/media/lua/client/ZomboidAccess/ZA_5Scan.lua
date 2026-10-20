@@ -157,9 +157,23 @@ local function newLists()
 end
 
 -- Objects that span several tiles (double beds, baths, garage doors) are listed once.
+-- Two halves of one thing (a double door, a wide window) side by side in the same wall: facing the same way, and
+-- next to each other along that wall, not across it. Without this a house's locked front door was merged into the
+-- bathroom door just inside it, diagonally next to it, and never listed (in game 2026-10-20).
+local function sameWall(a, b)
+    -- (only wall pieces have getNorth: asking anything else throws, and the game logs every throw)
+    local function wallPiece(o) return instanceof(o, "IsoDoor") or instanceof(o, "IsoWindow") or instanceof(o, "IsoThumpable") end
+    if not (wallPiece(a) and wallPiece(b)) then return true end   -- anything next to it is the same thing
+    local na, nb = a:getNorth(), b:getNorth()
+    if na ~= nb then return false end
+    local ax, ay, bx, by = a:getX(), a:getY(), b:getX(), b:getY()
+    if na then return ay == by else return ax == bx end
+end
+
 local function addMerged(lists, cat, e)
     for _, o in ipairs(lists[cat]) do
-        if o.baseName == e.baseName and o.z == e.z and math.abs(o.x - e.x) <= 1.01 and math.abs(o.y - e.y) <= 1.01 then
+        if o.baseName == e.baseName and o.z == e.z and math.abs(o.x - e.x) <= 1.01 and math.abs(o.y - e.y) <= 1.01
+            and (not (o.obj and e.obj) or sameWall(o.obj, e.obj)) then
             return
         end
     end
