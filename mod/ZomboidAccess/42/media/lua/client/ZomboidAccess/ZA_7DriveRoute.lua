@@ -175,6 +175,7 @@ function RT.plan(sx, sy, tx, ty, z)
     g[s] = 0
     hpush(h, 0, s)
     local best, bestH = s, 1e9
+    local bestRoad, bestRoadH = nil, 1e9   -- the same, among road squares only
     local dirs = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }
     local steps = 0
     local reached
@@ -197,6 +198,11 @@ function RT.plan(sx, sy, tx, ty, z)
                 score = score - 10
             end
             if score < bestH then best, bestH = cur, score end
+            -- A far place is reached by roads. The nearest point in a straight line can be a field: from a car in
+            -- a field (2026-10-20) the "best" was 20 m off in the grass, the route ended there, it was planned
+            -- again every frame (the game fell to 4 images a second) and the car never moved. So the best ROAD
+            -- square wins when there is one.
+            if score < bestRoadH and roadAt(cx2, cy2, z) then bestRoad, bestRoadH = cur, score end
             for _, dd in ipairs(dirs) do
                 local i2, j2 = ci + dd[1], cj + dd[2]
                 if i2 >= 0 and i2 <= ni and j2 >= 0 and j2 <= nj then
@@ -238,7 +244,7 @@ function RT.plan(sx, sy, tx, ty, z)
             end
         end
     end
-    local endNode = reached or best
+    local endNode = reached or bestRoad or best
     local pts = {}
     local n = endNode
     while n do
@@ -451,12 +457,20 @@ function RT.tick()
     local i, off = nearestIndex(r, v)
     r.i = i
     local dPlanEnd = math.sqrt((r.endX - v:getX()) ^ 2 + (r.endY - v:getY()) ^ 2)
-    if off > 8 or (not r.full and dPlanEnd < 40) or t - r.plannedAt > 8000 then
+    -- (never more than once a second: a plan takes about 50 ms, and planned on every frame it froze the game)
+    if (off > 8 or (not r.full and dPlanEnd < 40) or t - r.plannedAt > 8000) and t - (r.plannedAt or 0) > 1000 then
+        local oldEndX, oldEndY = r.endX, r.endY
         if not RT.replan(v) then
             RT.stop(false, ZA.tr("Route_Lost"))
             return
         end
         i = 1
+        -- the same short dead end again and again: no road from here leads on towards the place
+        if not r.full and oldEndX and math.abs(r.endX - oldEndX) < 2 and math.abs(r.endY - oldEndY) < 2
+            and math.sqrt((r.endX - v:getX()) ^ 2 + (r.endY - v:getY()) ^ 2) < 6 then
+            RT.stop(false, ZA.tr("Route_Lost"))
+            return
+        end
     end
 
     -- where to aim: further ahead the faster you go
