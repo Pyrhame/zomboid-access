@@ -35,7 +35,9 @@ end
 -- A box to type a name into (keyboard).
 function MK.rename(m)
     local ok, err = pcall(function()
-        local box = ISTextBox:new(0, 0, 280, 180, ZA.tr("ScanMarkers_BoxTitle"), m.name, nil, function(target, button)
+        -- an empty box: with the default name in it, what you type is added after it (in game 2026-10-20 the
+        -- marker became "Maisonmaison principale"); left empty, the default name stays
+        local box = ISTextBox:new(0, 0, 280, 180, ZA.tr("ScanMarkers_BoxTitle"), "", nil, function(target, button)
             if button.internal == "OK" then
                 local t = button.parent.entry:getText()
                 if t and t:match("%S") then
