@@ -6,7 +6,7 @@
 --   While it faces a zombie (standing still) it also keeps you aiming at it, so pulling R2 all the way swings at
 --   once, on any controller: the game swings from R2 only while the right stick aims (a light R2 pull is only
 --   precision aim), and lock-on leaves the right stick free. L2 shoves.
--- The choice is kept in the save (ModData "ZomboidAccessSettings").
+-- The choice is kept in the save (ModData "ZomboidAccessSettings"); on until switched off.
 
 ZA.LK = ZA.LK or {}
 local LK = ZA.LK
@@ -19,7 +19,13 @@ local function settings()
     local ok, t = pcall(function() return ModData.getOrCreate("ZomboidAccessSettings") end)
     return ok and t or {}
 end
-function LK.isOn() return settings().lockOn == true end
+-- On unless switched off (Marc, 2026-10-19: on from the start of every game). Not in the tutorial, whose lesson
+-- teaches switching it on, and whose first fight comes before that lesson.
+function LK.isOn()
+    local v = settings().lockOn
+    if v == nil then return not (ZA.TU and ZA.TU.active and ZA.TU.active()) end
+    return v == true
+end
 
 local function dist(p, z) return math.sqrt((z:getX() - p:getX()) ^ 2 + (z:getY() - p:getY()) ^ 2) end
 
@@ -297,7 +303,7 @@ table.insert(S.builders, function(lists)
         x = p:getX(), y = p:getY(), z = p:getZ(),
         action = function()
             local s = settings()
-            s.lockOn = not (s.lockOn == true)
+            s.lockOn = not LK.isOn()
             LK.target = nil
             ZA.say(ZA.tr(s.lockOn and "LockOn_SwitchedOn" or "LockOn_SwitchedOff"))
         end,
