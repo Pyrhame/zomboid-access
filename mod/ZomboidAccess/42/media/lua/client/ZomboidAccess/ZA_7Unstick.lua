@@ -18,6 +18,8 @@ end
 function UN.tick()
     local p = getPlayer()
     if not p or p:isDead() then UN.since = nil; return end
+    -- the game paused (in game 2026-10-19: the pause menu opened mid swing, cleared 4 s later for nothing)
+    if isGamePaused() then UN.since = nil; return end
     local started = false
     pcall(function() started = p:isAttackStarted() end)
     if not (started and inSwing(p)) then UN.since = nil; return end

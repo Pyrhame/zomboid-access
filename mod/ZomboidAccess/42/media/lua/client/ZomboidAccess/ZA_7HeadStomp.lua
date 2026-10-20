@@ -1,5 +1,5 @@
 -- Zomboid Access: stand at the head of a zombie on the ground (Marc, 2026-10-18).
--- With lock-on on, when the zombie it is locked on to is on the ground within 2 metres, and no other zombie is
+-- With lock-on on, when the zombie it is locked on to is on the ground within 3 metres, and no other zombie is
 -- standing within 3 metres, your character walks by itself to its head and faces it: a stomp (L2) or a swing
 -- there hits the head, which takes three times the damage (CombatManager.applyMeleeHitLocationDamage), while the
 -- legs take almost none. The dodge cue as it goes (no words), then "In place: L2 stomps". Touching the left stick stops the walk
@@ -21,7 +21,8 @@ local HS = ZA.HS
 local S = ZA.S
 
 HS.HEAD = 6
-HS.trigger = 2.0     -- metres: a zombie on the ground this close sends you to its head
+HS.trigger = 3.0     -- metres: a zombie on the ground this close sends you to its head (2 until 2026-10-19: a hit
+                     -- knocks it back, and it often lay 2 to 3 metres off, too far)
 HS.clear = 3.0       -- metres: no other zombie standing this close
 HS.beyond = 0.35     -- metres: where you stand, past the head on the side away from the body
 HS.placed = 0.55     -- metres: head this close to you counts as in place (the stomp reaches under 0.6)
@@ -36,7 +37,7 @@ local function boneDist(ref, z, bone)
         if not ok then return nil end
         return res
     end
-    local hi = 3.0
+    local hi = 4.5   -- (a zombie up to 3 m off, HS.trigger, can have its head a body length further)
     local far = within(hi)
     if far == nil or far == false then return nil end
     local lo = 0
@@ -243,14 +244,23 @@ function HS.tick()
     end
     if HS.phase then return end    -- placed, failed or stopped: once per zombie on the ground
 
-    if d > HS.trigger or standingNear(p, t) then return end
+    -- why not now, logged once per zombie on the ground and reason (in game 2026-10-19: falls with no walk and no
+    -- way to tell why from the log)
+    local function notYet(why)
+        if HS.whyFor ~= t or HS.why ~= why then
+            HS.whyFor, HS.why = t, why
+            log(string.format("not yet: %s (%.1f m)", why, d))
+        end
+    end
+    if d > HS.trigger then notYet("too far"); return end
+    if standingNear(p, t) then notYet("a zombie standing close"); return end
     local moving = false
     pcall(function() moving = p:isPlayerMoving() end)
-    if moving or p:isPerformingAnAction() then return end
-    -- not in the middle of a swing either: the walk would be cut at once
-    local swinging = false
-    pcall(function() swinging = p:isAttackStarted() end)
-    if swinging then return end
+    if moving then notYet("you are moving"); return end
+    if p:isPerformingAnAction() then notYet("you are busy"); return end
+    -- A swing going on no longer holds it back (in game 2026-10-19 RT was pressed about every second, so there was
+    -- never a moment without one): the walk starts, your swings are held back from then on (HS.syncBan), and if the
+    -- swing still going cuts it, it starts again once that swing is over.
 
     -- Still falling: the game calls it on the ground at once, but its body takes about a second to lie flat (in
     -- game 2026-10-19, 0.2 s after the fall: head 0.14 m from its middle, legs still in the air). Wait until the
