@@ -41,7 +41,8 @@ function W.openLoot(container, itemName)
 end
 
 -- Every frame for 2 seconds: if the game swapped the container, put ours back; once the list shows it, select the item.
-ZA.onTick(function()
+-- (Registered once, so reloading this file in a running game doesn't run it twice.)
+if not W.selectTicking then W.selectTicking = true; ZA.onTick(function()
     local ps = W.pendingSelect
     if not ps then return end
     if getTimestampMs() > ps.until_ then W.pendingSelect = nil; return end
@@ -62,7 +63,7 @@ ZA.onTick(function()
             break
         end
     end
-end)
+end) end
 
 -- The game's own menu for one object, as the pad's interact-options button opens it (ISButtonPrompt:interact).
 function W.objectMenu(obj)
@@ -90,6 +91,13 @@ function W.use()
     if not e then ZA.say(ZA.tr("WalkUse_NothingSelected")); return end
     if e.action then e.action(); return end
     if not S.alive(e) then ZA.say(ZA.tr("WalkUse_Gone", S.entryName(e))); return end
+    -- driving: autodrive to it (ZA_7DriveRoute). Before the marker check: holding Square on a marker from the
+    -- driver's seat asked to remove the marker instead (2026-10-19), while the manual has markers as destinations.
+    local veh = p:getVehicle()
+    if veh and not e.noWhere then
+        if veh:isDriver(p) and ZA.RT then ZA.RT.start(e, "auto") else ZA.say(ZA.tr("WalkUse_OnlyDriver")) end
+        return
+    end
     if e.marker then
         local t = getTimestampMs()
         if W.removeAsk == e.marker and t - (W.removeAskAt or 0) < 4000 then
@@ -99,12 +107,6 @@ function W.use()
             W.removeAsk, W.removeAskAt = e.marker, t
             ZA.say(ZA.tr("WalkUse_RemoveAsk", e.marker.name))
         end
-        return
-    end
-    -- driving: autodrive to it (ZA_7DriveRoute)
-    local veh = p:getVehicle()
-    if veh and not e.noWhere and not e.action then
-        if veh:isDriver(p) and ZA.RT then ZA.RT.start(e, "auto") else ZA.say(ZA.tr("WalkUse_OnlyDriver")) end
         return
     end
     if e.noWhere then ZA.say(ZA.tr("WalkUse_NothingToUse")); return end
