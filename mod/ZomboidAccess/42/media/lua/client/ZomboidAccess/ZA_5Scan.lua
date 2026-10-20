@@ -57,10 +57,22 @@ function S.moveableName(o)
     if not spr then return nil end
     local props = spr:getProperties()
     if props and props:has("CustomName") then
-        local n = props:get("CustomName")
-        if props:has("GroupName") then n = props:get("GroupName") .. " " .. n end
-        local ok, t = pcall(function() return Translator.getMoveableDisplayName(n) end)
-        return (ok and t and t ~= "") and t or n
+        local custom = props:get("CustomName")
+        local group = props:has("GroupName") and props:get("GroupName") or nil
+        local n = group and (group .. " " .. custom) or custom
+        local function moveable(s)
+            local ok, t = pcall(function() return Translator.getMoveableDisplayName(s) end)
+            return (ok and t and t ~= "") and t or s
+        end
+        local t = moveable(n)
+        if t ~= n or not group then return t end
+        -- The game has no words for every group + name: "White Window Door" (fixtures_doors_01_47, in game
+        -- 2026-10-19) stays in English in French. When the name alone has words in this language (Door: Porte),
+        -- use those rather than English; in English both are the same and the full name is kept.
+        local alone = moveable(custom)
+        if alone == custom then return n end
+        if custom == "Door" and group:find("Window", 1, true) then return ZA.tr("Scan_DoorWindow") end
+        return alone
     end
     return nil
 end

@@ -1236,5 +1236,6 @@
     "UI_ZA_Scan_LevelBasement": "au sous-sol",
     "UI_ZA_Crouch_Down": "Accroupi",
     "UI_ZA_Crouch_Up": "Debout",
+    "UI_ZA_Scan_DoorWindow": "Porte-fenêtre",
     "UI_ZA_Core_DecimalSep": ","
 }

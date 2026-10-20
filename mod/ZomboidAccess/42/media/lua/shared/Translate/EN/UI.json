@@ -1236,5 +1236,6 @@
     "UI_ZA_Scan_LevelBasement": "in the basement",
     "UI_ZA_Crouch_Down": "Crouched",
     "UI_ZA_Crouch_Up": "Standing",
+    "UI_ZA_Scan_DoorWindow": "French door",
     "UI_ZA_Core_DecimalSep": "."
 }
