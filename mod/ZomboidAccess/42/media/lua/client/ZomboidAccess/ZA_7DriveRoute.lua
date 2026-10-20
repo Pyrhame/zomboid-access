@@ -456,6 +456,7 @@ function RT.tick()
     elseif sharp >= 20 then want = math.min(want, 20) end
     if math.abs(r.steer) > 25 then want = math.min(want, 12) end
     if math.abs(r.steer) > 45 then want = math.min(want, 8) end
+    if math.abs(r.steer) > 100 then want = math.min(want, 5) end   -- turning round
     if dEnd < 40 then want = math.min(want, 15) end
     -- stuck: cruise control on, barely moving for 3 seconds (against a wall, in a ditch): stop and say so
     if math.abs(speed) < 2 and r.speed and r.speed > 0 then
@@ -546,14 +547,17 @@ RT.cal = RT.cal or {}
 --   setAngles does nothing unless a whole degree changes (it compares the integer parts), so small turns are saved up
 --   until they make one (RT.cal.acc).
 local function trunc(x) return x >= 0 and math.floor(x) or math.ceil(x) end
-local function turnBody(v, deg)
+-- And at most every 150 ms (`now` forces it): a turn puts the car back where the physics last left it, so turning
+-- every frame held it still (2026-10-20: 0 to 3 km/h for a cruise control of 8, once the turning took over).
+local function turnBody(v, deg, now)
     local ax, ay, az = v:getAngleX(), v:getAngleY(), v:getAngleZ()
     local s = math.abs(ax) > 90 and -1 or 1
     local acc = (RT.cal.acc or 0) + deg
     local ny = ay + s * acc
-    if trunc(ny) ~= trunc(ay) or trunc(az) ~= az then
+    local t = getTimestampMs()
+    if (now or t - (RT.cal.turnedAt or 0) >= 150) and (trunc(ny) ~= trunc(ay) or trunc(az) ~= az) then
         v:setAngles(ax, ny, az)
-        RT.cal.acc = 0
+        RT.cal.acc, RT.cal.turnedAt = 0, t
     else
         RT.cal.acc = acc
     end
@@ -563,23 +567,23 @@ local function pushYaw(r, v, speed)
     local t = getTimestampMs()
     local dt = (t - (r.yawT or t)) / 1000
     r.yawT = t
-    if dt <= 0 then return end
+    if dt <= 0 then return true end
     if dt > 0.1 then dt = 0.1 end
     local ms = speed / 3.6
-    if ms < 0.8 then return end   -- (also not backwards)
     local C = RT.cal
     -- the check needs the car really moving forward: at walking pace, or backing out, the tyres hold it
-    -- (2026-10-20: checked at 0.8 m/s with the route behind, failed, and the drive went on with the push)
-    if not C.sign and ms < 2 then return end
+    -- (2026-10-20: checked at 0.8 m/s with the route behind, failed, and the drive went on with the push);
+    -- until then the push steers (false: not handled here)
+    if not C.sign and ms < 2 then return false end
     if not C.sign then
         -- which way, and does it keep the speed: turn 3 degrees, look again 0.2 s later
         if not C.at then
             C.hx, C.hy = heading(v)
             C.ms, C.at = ms, t
-            turnBody(v, 3)
-            return
+            turnBody(v, 3, true)
+            return true
         end
-        if t - C.at < 200 then return end
+        if t - C.at < 200 then return true end
         local hx, hy = heading(v)
         local cross = C.hx * hy - C.hy * hx   -- + = the car turned right (clockwise on the map)
         local ms2 = v:getCurrentSpeedKmHour() / 3.6
@@ -589,7 +593,7 @@ local function pushYaw(r, v, speed)
             C.failed = true
             ZA.log(string.format("[ZA] autodrive: turning the body doesn't work (turned %.3f, speed %.1f -> %.1f m/s), back to the push",
                 cross, C.ms, ms2))
-            return
+            return false
         end
         C.sign = cross > 0 and 1 or -1
         ZA.log(string.format("[ZA] autodrive: turning the body works (sign %d, speed %.1f -> %.1f m/s)", C.sign, C.ms, ms2))
@@ -599,8 +603,14 @@ local function pushYaw(r, v, speed)
     local px, py = along(r, r.i or 1, look)
     local a = math.rad(bearing(v, px, py))          -- + = to the right
     local w
-    if math.abs(a) >= math.pi / 2 then
-        w = (a > 0 and 1 or -1) * ms / RT.rMin       -- behind you: as tight as a car can
+    if math.abs(a) >= math.rad(100) then
+        -- the route is behind (a drive starting the wrong way, 2026-10-20: the car crept into a wall): turn round
+        -- on the spot, 40 degrees a second, whatever the speed; the cruise control holds it to a crawl meanwhile
+        w = (a > 0 and 1 or -1) * 0.7
+    elseif ms < 0.8 then
+        return true                                  -- (also not backwards)
+    elseif math.abs(a) >= math.pi / 2 then
+        w = (a > 0 and 1 or -1) * ms / RT.rMin       -- beside you: as tight as a car can
     else
         w = ms * 2 * math.sin(a) / look              -- radians a second, + = right
         local wMax = ms / RT.rMin
@@ -608,6 +618,7 @@ local function pushYaw(r, v, speed)
     end
     if w > 1.6 then w = 1.6 elseif w < -1.6 then w = -1.6 end
     turnBody(v, math.deg(w * dt) * C.sign)
+    return true
 end
 
 function RT.push()
@@ -618,7 +629,7 @@ function RT.push()
     if not v or not r.steer then return end
     local t = getTimestampMs()
     local speed = v:getCurrentSpeedKmHour()
-    if RT.steerMode == "yaw" then return pushYaw(r, v, speed) end
+    if RT.steerMode == "yaw" and pushYaw(r, v, speed) then return end
     local hx, hy = heading(v)
     local hNow = math.deg(math.atan2(hy, hx))
     -- how fast the car is turning, measured over at least 80 ms (this runs many times between physics steps)
