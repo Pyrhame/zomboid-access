@@ -1246,5 +1246,6 @@
     "UI_ZA_Radio_Folded": "folded",
     "UI_ZA_Radio_UnfoldHint": "Right unfolds it",
     "UI_ZA_Radio_WindowHint": "{R1}: into the settings, then Up and Down go from one to the next",
+    "UI_ZA_Route_Stuck": "The car is stuck. Autodrive stopped: back out or get it free yourself, then pick the place again.",
     "UI_ZA_Core_DecimalSep": "."
 }

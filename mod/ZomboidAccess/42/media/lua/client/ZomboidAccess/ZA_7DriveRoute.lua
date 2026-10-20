@@ -2,10 +2,11 @@
 -- you don't"). In the driver's seat, pick anything in the scanner (Places, Houses, a town, a marker, a door...):
 --   Square / End: route guidance. The steering tone follows the route instead of just the road; "Turn left in 40
 --     metres" before turns; "Arrived" at the end. You drive.
---   Hold Square / Delete: autodrive along the same route. Cruise control drives the speed (slower for turns, slower
---     still near zombies); the mod steers by pushing the car (BaseVehicle:addImpulse, a turning force), the only way
---     a mod can turn a car. Brake (Circle) or reverse and the game turns cruise control off: autodrive stops and the
---     car is yours. Something in the road ahead stops it too.
+--   Hold Square / Delete: autodrive along the same route. Cruise control drives the speed (slow before a bend, by
+--     how sharp it is; slower near zombies); the mod steers by turning the car's body along the route (see pushYaw;
+--     the older turning push, BaseVehicle:addImpulse, if that fails). Brake (Circle) or reverse and the game turns
+--     cruise control off: autodrive stops and the car is yours. Something in the road ahead stops it too, and so does
+--     being stuck (barely moving for 3 seconds).
 --   Square / End again: stop the route.
 -- The route: roads first (A* on every other square, road cheap, grass 25 times dearer, buildings, trees, solid things
 -- and fences shut),
@@ -51,12 +52,29 @@ end
 -- What it costs to drive over a square: road 1, open ground 25, nil where a car can't go. Off the road only within
 -- 15 squares of where you start and of where you're going (to reach the road, and to reach the place): the rest of
 -- the way is roads only, so routes never wander into fields with fences and ditches.
-local costCache, ends
+local costCache, roadCache, ends
 local function nearEnds(x, y)
     for _, e in ipairs(ends) do
         if math.abs(x - e[1]) <= 15 and math.abs(y - e[2]) <= 15 then return true end
     end
     return false
+end
+local function roadAt(x, y, z)
+    local k = x * 100000 + y
+    local c = roadCache[k]
+    if c == nil then c = isRoad(x, y, z) == true; roadCache[k] = c end
+    return c
+end
+-- How close a road square is to the road's edge: 0 in the middle, up to 8 right by the verge. Added to its cost,
+-- it keeps routes in the middle of the road, away from the kerbs, fences and walls along it (2026-10-20: the car
+-- clipped them at turns, the route hugging the inside of every bend).
+local function edgeCost(x, y, z)
+    local e = 0
+    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        if not roadAt(x + d[1], y + d[2], z) then e = e + 2
+        elseif not roadAt(x + 2 * d[1], y + 2 * d[2], z) then e = e + 1 end
+    end
+    return e
 end
 local function cost(x, y, z)
     local k = x * 100000 + y
@@ -64,8 +82,8 @@ local function cost(x, y, z)
     if c ~= nil then return c or nil end
     local sq = getCell():getGridSquare(x, y, z)
     if not sq then costCache[k] = false; return nil end
-    if isRoad(x, y, z) then
-        c = (sq:isSolid() or sq:isSolidTrans()) and false or 1
+    if roadAt(x, y, z) then
+        c = (sq:isSolid() or sq:isSolidTrans()) and false or (1 + edgeCost(x, y, z))
     elseif not nearEnds(x, y) or sq:getRoom() or sq:isSolid() or sq:isSolidTrans() or not sq:getFloor() then
         c = false
     else
@@ -85,7 +103,7 @@ end
 -- (NOT towards a point on the straight line: that can be a fenced field, a dead end). Returns the points and
 -- whether they reach the target.
 function RT.plan(sx, sy, tx, ty, z)
-    costCache = {}
+    costCache, roadCache = {}, {}
     ends = { { sx, sy }, { tx, ty } }
     local st = RT.step
     local dx, dy = tx - sx, ty - sy
@@ -310,11 +328,32 @@ end
 -- slow down hard: a push against the way the car is going (one impulse per update, so not while steering)
 local vel = Vector3f.new()
 local function brake(v)
+    -- the game's own brake, held for a second (BaseVehicle:setForceBrake: the same as pressing brake, what the
+    -- game does when a car hits a zombie); the push against the motion only if that isn't there
+    if pcall(function() v:setForceBrake() end) then return end
     v:getLinearVelocity(vel)
     local vx, vz = vel:x(), vel:z()
     local l = math.sqrt(vx * vx + vz * vz)
     if l < 0.2 then return end
     v:addImpulse(Vector3f.new(-vx / l * 900, 0, -vz / l * 900), Vector3f.new(0, 0, 0))
+end
+
+-- How sharp the route turns in the next `within` squares: the largest change of direction, in degrees, measured over
+-- 6 squares at a time (so a bend made of many small steps counts whole), and how far away it starts.
+local function sharpAhead(r, i, within)
+    local acc, worst, at = 0, 0, nil
+    for k = i + 1, #r.pts - 3 do
+        local a, b = r.pts[k - 1], r.pts[k]
+        acc = acc + math.sqrt((b.x - a.x) ^ 2 + (b.y - a.y) ^ 2)
+        if acc > within then break end
+        local c = r.pts[k + 3]
+        local h1 = math.atan2(b.y - a.y, b.x - a.x)
+        local h2 = math.atan2(c.y - b.y, c.x - b.x)
+        local d = math.abs(math.deg(h2 - h1))
+        while d > 180 do d = math.abs(d - 360) end
+        if d > worst then worst, at = d, acc end
+    end
+    return worst, at
 end
 
 function RT.tick()
@@ -393,12 +432,29 @@ function RT.tick()
         RT.stop(false, ZA.tr("Route_AutoOff"))
         return
     end
-    -- speed: 40 on the open road, slower for a turn ahead, near zombies, and near the end
-    local want = RT.cruise or 20
-    if dist and dist < 40 then want = math.min(want, 20) end
-    if math.abs(r.steer) > 25 then want = 15 end
-    if math.abs(r.steer) > 45 then want = 10 end
-    if dEnd < 40 then want = math.min(want, 20) end
+    -- speed: by how sharp the road ahead turns, so the car is slow BEFORE the bend (2026-10-20: it hit walls at
+    -- junctions, still at 20 km/h in the turn); slower near zombies and near the end
+    local want = RT.cruise or (RT.steerMode == "yaw" and 30 or 20)
+    local sharp, sharpAt = sharpAhead(r, i, 35)
+    if sharp >= 70 then want = math.min(want, (sharpAt or 0) < 15 and 8 or 12)
+    elseif sharp >= 40 then want = math.min(want, (sharpAt or 0) < 15 and 12 or 15)
+    elseif sharp >= 20 then want = math.min(want, 20) end
+    if math.abs(r.steer) > 25 then want = math.min(want, 12) end
+    if math.abs(r.steer) > 45 then want = math.min(want, 8) end
+    if dEnd < 40 then want = math.min(want, 15) end
+    -- stuck: cruise control on, barely moving for 3 seconds (against a wall, in a ditch): stop and say so
+    if math.abs(speed) < 2 and r.speed and r.speed > 0 then
+        r.slowSince = r.slowSince or t
+        if t - r.slowSince > 3000 then RT.stop(false, ZA.tr("Route_Stuck")); return end
+    else
+        r.slowSince = nil
+    end
+    -- developer log: how the car follows the route, twice a second
+    if ZA.dev and t >= (r.logAt or 0) then
+        r.logAt = t + 500
+        ZA.log(string.format("[ZA] autodrive: %s %.0f km/h (want %d), steer %.0f, off route %.1f, sharp %.0f at %s",
+            RT.steerMode, speed, want, r.steer, off, sharp, tostring(sharpAt and math.floor(sharpAt))))
+    end
     if DR.lastAhead and DR.lastAhead.what == "Zombie" and t - DR.lastAhead.t < 1500 then want = math.min(want, 15) end
     -- something in the road close ahead: stop
     -- (only things ON the road: the straight-line look ahead finds the trees beside every bend, and the route
@@ -422,6 +478,84 @@ function RT.tick()
     RT.push()
 end
 
+-- ---------- steering by turning the car itself ----------
+-- The push below makes the car turn only past a threshold, and by an amount that depends on its grip: it under- and
+-- over-steered at junctions (2026-10-20). A car's body can be turned instead (BaseVehicle:setAngles, which moves it
+-- in the physics: Bullet.teleportVehicle with its own position and a new heading), a little each frame, by exactly
+-- what a car on that path turns: pure pursuit, the curve through a point a few metres along the route, followed at
+-- the car's speed, no tighter than a real car can turn (RT.rMin). Its tyres then carry it the new way.
+-- Checked the first time on each drive: which way the angle turns the car, and that the car keeps its speed; if
+-- either fails, back to the push (RT.steerMode = "push").
+RT.steerMode = RT.steerMode or "yaw"
+RT.rMin = 5.0         -- metres: the tightest circle a car drives
+RT.cal = RT.cal or {}
+
+-- Turn the car `deg` degrees about the vertical. Two catches in the game's angles:
+--   they are Euler X, Y, Z, where Y (the heading) only goes from -90 to 90: a car facing the other half of the
+--   compass reads X and Z near 180, and there a bigger Y turns it the other way (Rx(180) Ry(y) Rz(180) = Ry(180 - y));
+--   setAngles does nothing unless a whole degree changes (it compares the integer parts), so small turns are saved up
+--   until they make one (RT.cal.acc).
+local function trunc(x) return x >= 0 and math.floor(x) or math.ceil(x) end
+local function turnBody(v, deg)
+    local ax, ay, az = v:getAngleX(), v:getAngleY(), v:getAngleZ()
+    local s = math.abs(ax) > 90 and -1 or 1
+    local acc = (RT.cal.acc or 0) + deg
+    local ny = ay + s * acc
+    if trunc(ny) ~= trunc(ay) or trunc(az) ~= az then
+        v:setAngles(ax, ny, az)
+        RT.cal.acc = 0
+    else
+        RT.cal.acc = acc
+    end
+end
+
+local function pushYaw(r, v, speed)
+    local t = getTimestampMs()
+    local dt = (t - (r.yawT or t)) / 1000
+    r.yawT = t
+    if dt <= 0 then return end
+    if dt > 0.1 then dt = 0.1 end
+    local ms = speed / 3.6
+    if ms < 0.8 then return end   -- (also not backwards)
+    local C = RT.cal
+    if not C.sign then
+        -- which way, and does it keep the speed: turn 3 degrees, look again 0.2 s later
+        if not C.at then
+            C.hx, C.hy = heading(v)
+            C.ms, C.at = ms, t
+            turnBody(v, 3)
+            return
+        end
+        if t - C.at < 200 then return end
+        local hx, hy = heading(v)
+        local cross = C.hx * hy - C.hy * hx   -- + = the car turned right (clockwise on the map)
+        local ms2 = v:getCurrentSpeedKmHour() / 3.6
+        C.at = nil
+        if math.abs(cross) < 0.02 or ms2 < C.ms * 0.6 then
+            RT.steerMode = "push"
+            ZA.log(string.format("[ZA] autodrive: turning the body doesn't work (turned %.3f, speed %.1f -> %.1f m/s), back to the push",
+                cross, C.ms, ms2))
+            return
+        end
+        C.sign = cross > 0 and 1 or -1
+        ZA.log(string.format("[ZA] autodrive: turning the body works (sign %d, speed %.1f -> %.1f m/s)", C.sign, C.ms, ms2))
+    end
+    -- pure pursuit: aim at a point a little ahead, nearer when slow (tight turns), further when fast (smooth)
+    local look = math.max(4, math.min(12, 3 + ms * 0.7))   -- (shorter overshoots a square corner: a car turns no tighter than 5 m)
+    local px, py = along(r, r.i or 1, look)
+    local a = math.rad(bearing(v, px, py))          -- + = to the right
+    local w
+    if math.abs(a) >= math.pi / 2 then
+        w = (a > 0 and 1 or -1) * ms / RT.rMin       -- behind you: as tight as a car can
+    else
+        w = ms * 2 * math.sin(a) / look              -- radians a second, + = right
+        local wMax = ms / RT.rMin
+        if w > wMax then w = wMax elseif w < -wMax then w = -wMax end
+    end
+    if w > 1.6 then w = 1.6 elseif w < -1.6 then w = -1.6 end
+    turnBody(v, math.deg(w * dt) * C.sign)
+end
+
 function RT.push()
     local r = RT.route
     if not r or r.mode ~= "auto" or not r.wantPush or r.stopping then return end
@@ -430,6 +564,7 @@ function RT.push()
     if not v or not r.steer then return end
     local t = getTimestampMs()
     local speed = v:getCurrentSpeedKmHour()
+    if RT.steerMode == "yaw" then return pushYaw(r, v, speed) end
     local hx, hy = heading(v)
     local hNow = math.deg(math.atan2(hy, hx))
     -- how fast the car is turning, measured over at least 80 ms (this runs many times between physics steps)
