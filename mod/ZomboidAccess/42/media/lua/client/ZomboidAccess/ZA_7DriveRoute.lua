@@ -461,7 +461,9 @@ function RT.tick()
     -- stuck: cruise control on, barely moving for 3 seconds (against a wall, in a ditch): stop and say so
     if math.abs(speed) < 2 and r.speed and r.speed > 0 then
         r.slowSince = r.slowSince or t
-        if t - r.slowSince > 3000 then RT.stop(false, ZA.tr("Route_Stuck")); return end
+        -- (turning round on the spot is slow on purpose: give it longer)
+        local limit = (r.pivotAt and t - r.pivotAt < 500) and 10000 or 3000
+        if t - r.slowSince > limit then RT.stop(false, ZA.tr("Route_Stuck")); return end
     else
         r.slowSince = nil
     end
@@ -603,10 +605,12 @@ local function pushYaw(r, v, speed)
     local px, py = along(r, r.i or 1, look)
     local a = math.rad(bearing(v, px, py))          -- + = to the right
     local w
-    if math.abs(a) >= math.rad(100) then
-        -- the route is behind (a drive starting the wrong way, 2026-10-20: the car crept into a wall): turn round
-        -- on the spot, 40 degrees a second, whatever the speed; the cruise control holds it to a crawl meanwhile
+    if math.abs(a) >= math.rad(100) or (ms < 2 and math.abs(a) >= math.rad(50)) then
+        -- the route is behind, or well to the side while barely moving (a drive starting the wrong way or across
+        -- the road, 2026-10-20: the car crept into a wall, then sat at 1 km/h with the route at 95 degrees): turn
+        -- round on the spot, 40 degrees a second, whatever the speed; the cruise control holds it to a crawl
         w = (a > 0 and 1 or -1) * 0.7
+        r.pivotAt = t
     elseif ms < 0.8 then
         return true                                  -- (also not backwards)
     elseif math.abs(a) >= math.pi / 2 then
