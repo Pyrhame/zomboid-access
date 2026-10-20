@@ -720,6 +720,9 @@ local function noneText(c)
         return ZA.tr("Scan_NoneSeen", c.none)
     end
     if c.key == "zombies" or c.key == "animals" then return ZA.tr("Scan_NoneWithin", c.none, S.mobRadius) end
+    -- places and houses come from the map, much further than the 20 metres around you (ZA_5ScanPlaces)
+    if c.key == "houses" then return ZA.tr("Scan_NoneWithin", c.none, S.housesRadius or 300) end
+    if c.key == "places" then return ZA.tr("Scan_NoneWithin", c.none, S.placesRadius or 600) end
     return ZA.tr("Scan_NoneWithin", c.none, S.radius)
 end
 

@@ -5,6 +5,8 @@
 -- End / Square on one travels there on foot in short legs (ZA_6Walk.lua).
 
 local S = ZA.S
+S.placesRadius = 600   -- metres
+S.housesRadius = 300
 
 -- Room names -> what the building is, most telling first. Room names come from the map (seen in
 -- Muldraugh 2026-10-01: policeoffice, pharmacy, toolstore, gas2go, armysurplus...).
@@ -57,7 +59,8 @@ table.insert(S.builders, function(lists)
     local px, py = p:getX(), p:getY()
     local mg = getWorld():getMetaGrid()
     local list = ArrayList.new()   -- (entries are keyed by position: getID() is not unique for unloaded buildings)
-    mg:getBuildingsIntersecting(math.floor(px) - 600, math.floor(py) - 600, 1200, 1200, list)
+    local R = S.placesRadius
+    mg:getBuildingsIntersecting(math.floor(px) - R, math.floor(py) - R, 2 * R, 2 * R, list)
     for i = 0, list:size() - 1 do
         local b = list:get(i)
         local kind = buildingKind(b)
@@ -66,7 +69,7 @@ table.insert(S.builders, function(lists)
         local d = math.sqrt((x - px) ^ 2 + (y - py) ^ 2)
         local cat
         if kind and not res then cat = "places"
-        elseif res and d <= 300 then cat = "houses"; kind = ZA.tr("ScanPlaces_Kind_house") end
+        elseif res and d <= S.housesRadius then cat = "houses"; kind = ZA.tr("ScanPlaces_Kind_house") end
         if cat and kind then
             local bb = b
             table.insert(lists[cat], {
@@ -103,7 +106,7 @@ table.insert(S.builders, function(lists)
     lists.places = kept
     for _, t in ipairs(S.towns) do
         local d = math.sqrt((t.x - px) ^ 2 + (t.y - py) ^ 2)
-        local here = d < 600
+        local here = d < S.placesRadius
         table.insert(lists.places, {
             cat = "places", key = "places|town|" .. t.name, baseName = t.name, walk = "travel", far = true,
             name = here and ZA.tr("ScanPlaces_TownHere", t.name) or ZA.tr("ScanPlaces_Town", t.name), x = t.x, y = t.y, z = 0,
