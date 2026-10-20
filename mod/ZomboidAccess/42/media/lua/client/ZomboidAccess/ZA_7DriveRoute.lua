@@ -59,10 +59,20 @@ local function nearEnds(x, y)
     end
     return false
 end
+-- A road: a street tile, or a square of the map's road zones ("Nav": also the dirt and gravel roads between towns,
+-- which have no street tiles).
 local function roadAt(x, y, z)
     local k = x * 100000 + y
     local c = roadCache[k]
-    if c == nil then c = isRoad(x, y, z) == true; roadCache[k] = c end
+    if c == nil then
+        c = isRoad(x, y, z) == true
+        if not c then
+            local sq = getCell():getGridSquare(x, y, z)
+            if sq then pcall(function() c = sq:getZoneType() == "Nav" end) end
+        end
+        roadCache[k] = c == true
+        c = roadCache[k]
+    end
     return c
 end
 -- How close a road square is to the road's edge: 0 in the middle, up to 8 right by the verge. Added to its cost,
@@ -320,6 +330,118 @@ local function nextTurn(r, i)
     return nil
 end
 
+-- ---------- the long way: the map's road zones ----------
+-- A far place is planned on the whole map's roads first, then driven stretch by stretch. The map's "Nav" zones are
+-- known for the whole world, loaded or not (IsoMetaGrid:getZonesAt); sampled every 5 squares between you and the
+-- place (and 400 m round), a road is a run of samples, joined over gaps of up to 2. In game 2026-10-20, Riverside to
+-- Fallas Lake: 4468 road samples, connected, sampled in 245 ms. Without this the car headed for the loaded road
+-- square nearest the place in a straight line: a field, or two road ends it swapped between.
+RT.navStep, RT.navMargin = 5, 400
+
+function RT.navStart(sx, sy, tx, ty)
+    local st, m = RT.navStep, RT.navMargin
+    local b = { st = st, sx = sx, sy = sy, tx = tx, ty = ty, nav = {}, row = 0 }
+    b.x0, b.y0 = math.floor(math.min(sx, tx) - m), math.floor(math.min(sy, ty) - m)
+    b.nx = math.floor((math.max(sx, tx) + m - b.x0) / st) + 1
+    b.ny = math.floor((math.max(sy, ty) + m - b.y0) / st) + 1
+    b.list = ArrayList.new()
+    return b
+end
+
+-- Samples rows until `budget` samples are done; true when the whole grid is.
+function RT.navSample(b, budget)
+    local mg = getWorld():getMetaGrid()
+    local done = 0
+    while b.row < b.ny and done < budget do
+        local j = b.row
+        for i = 0, b.nx - 1 do
+            b.list:clear()
+            mg:getZonesAt(b.x0 + i * b.st, b.y0 + j * b.st, 0, b.list)
+            for k = 0, b.list:size() - 1 do
+                if b.list:get(k):getType() == "Nav" then b.nav[j * b.nx + i] = true; break end
+            end
+        end
+        done = done + b.nx
+        b.row = b.row + 1
+    end
+    return b.row >= b.ny
+end
+
+-- The road samples from the one nearest the start to the one nearest the place (A*, steps of up to 2 samples):
+-- a list of points, or nil.
+function RT.navPath(b)
+    local nx, st = b.nx, b.st
+    local function near(px, py)
+        local best, bd
+        for id in pairs(b.nav) do
+            local i, j = id % nx, math.floor(id / nx)
+            local d = (b.x0 + i * st - px) ^ 2 + (b.y0 + j * st - py) ^ 2
+            if not bd or d < bd then best, bd = id, d end
+        end
+        return best, bd and math.sqrt(bd) or nil
+    end
+    local s, ds = near(b.sx, b.sy)
+    local g, dg = near(b.tx, b.ty)
+    if not s or not g or ds > 150 or dg > 300 then return nil end
+    local gi, gj = g % nx, math.floor(g / nx)
+    local gs, came, closed, h = { [s] = 0 }, {}, {}, {}
+    hpush(h, 0, s)
+    local steps = 0
+    while #h > 0 do
+        steps = steps + 1
+        if steps > 200000 then return nil end
+        local cur = hpop(h)[2]
+        if cur == g then break end
+        if not closed[cur] then
+            closed[cur] = true
+            local ci, cj = cur % nx, math.floor(cur / nx)
+            for dj = -2, 2 do
+                for di = -2, 2 do
+                    if di ~= 0 or dj ~= 0 then
+                        local n = (cj + dj) * nx + (ci + di)
+                        if b.nav[n] and not closed[n] then
+                            local ng = gs[cur] + math.sqrt(di * di + dj * dj)
+                            if not gs[n] or ng < gs[n] then
+                                gs[n], came[n] = ng, cur
+                                local hi, hj = (ci + di) - gi, (cj + dj) - gj
+                                hpush(h, ng + math.sqrt(hi * hi + hj * hj), n)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if not came[g] and g ~= s then return nil end
+    local out, n = {}, g
+    while n do
+        table.insert(out, 1, { x = b.x0 + (n % nx) * st + 0.5, y = b.y0 + math.floor(n / nx) * st + 0.5 })
+        n = came[n]
+    end
+    return out
+end
+
+-- The next stretch's goal on the long way: the furthest of its points within `reach` of the car, from the one
+-- nearest the car on.
+local function longGoal(r, x, y, reach)
+    local L = r.long
+    local best, bd = r.wi or 1, 1e18
+    for k = r.wi or 1, math.min(#L, (r.wi or 1) + 80) do
+        local d = (L[k].x - x) ^ 2 + (L[k].y - y) ^ 2
+        if d < bd then best, bd = k, d end
+    end
+    r.wi = best
+    local goal = best
+    -- (and loaded: the game has squares only round you, about 100 m; a goal past them can't be planned to)
+    local cell = getCell()
+    for k = best, math.min(#L, best + 120) do
+        if (L[k].x - x) ^ 2 + (L[k].y - y) ^ 2 <= reach * reach
+            and cell:getGridSquare(math.floor(L[k].x), math.floor(L[k].y), 0) then goal = k end
+    end
+    return goal
+end
+RT.longGoal = longGoal
+
 function RT.replan(v)
     local r = RT.route
     local tx, ty = S.entryPos(r.entry)
@@ -329,7 +451,20 @@ function RT.replan(v)
     -- near the place swapped as the loaded area moved, and the car turned round again and again (2026-10-20,
     -- "the route is behind you" every 25 seconds on the way to Fallas Lake).
     local pts, full
-    if r.goalX and (r.goalX - x) ^ 2 + (r.goalY - y) ^ 2 > 40 * 40 then
+    -- on the long way: the next stretch along it (110 m, else 60), the place itself once in reach
+    if r.long and (tx - x) ^ 2 + (ty - y) ^ 2 > (RT.reach - 20) ^ 2 then
+        for _, reach in ipairs({ 110, 60 }) do
+            local k = longGoal(r, x, y, reach)
+            local gp = r.long[k]
+            local p2, f2 = RT.plan(x, y, gp.x, gp.y, z)
+            if f2 and #p2 >= 2 then pts, full = p2, false; break end
+        end
+        if not pts then
+            ZA.log("[ZA] autodrive: the long way can't be followed from here, nearest road instead")
+            r.long = nil
+        end
+    end
+    if not pts and r.goalX and (r.goalX - x) ^ 2 + (r.goalY - y) ^ 2 > 40 * 40 then
         pts, full = RT.plan(x, y, r.goalX, r.goalY, z)
         if full then
             full = false                         -- the goal is only a stretch of the way
@@ -339,6 +474,7 @@ function RT.replan(v)
     end
     if not pts then
         pts, full = RT.plan(x, y, tx, ty, z)
+        if full then r.long = nil end
         if not full and #pts >= 2 then r.goalX, r.goalY = pts[#pts].x, pts[#pts].y else r.goalX, r.goalY = nil, nil end
     end
     if #pts < 2 then return false end
@@ -354,6 +490,13 @@ function RT.start(e, mode)
     if not v or not v:isDriver(p) then return false end
     if RT.route then RT.stop(true) end
     RT.route = { entry = e, mode = mode, saidTurn = {}, lastBand = nil }
+    -- far: the long way on the map's roads is worked out first, over the next frames (RT.tick)
+    do
+        local tx, ty = S.entryPos(e)
+        if (tx - v:getX()) ^ 2 + (ty - v:getY()) ^ 2 > (RT.reach - 20) ^ 2 then
+            RT.route.navBuild = RT.navStart(v:getX(), v:getY(), tx, ty)
+        end
+    end
     -- a failed check of the body turning is tried again on the next drive
     if RT.cal.failed then RT.cal, RT.steerMode = {}, "yaw" end
     local ok, res = pcall(RT.replan, v)
@@ -449,6 +592,26 @@ function RT.tick()
     local v = p and p:getVehicle()
     if not v or not v:isDriver(p) then RT.stop(true); return end
     local t = getTimestampMs()
+    -- working out the long way: 25000 samples a frame (about 110 ms), the car held meanwhile
+    if r.navBuild then
+        if r.mode == "auto" then v:setRegulator(false); r.speed = 0 end
+        local ok, done = pcall(RT.navSample, r.navBuild, 25000)
+        if not ok or done then
+            local path = nil
+            if ok then
+                local ok2, res = pcall(RT.navPath, r.navBuild)
+                if ok2 then path = res else print("[ZA] long way error: " .. tostring(res)) end
+            else
+                print("[ZA] long way error: " .. tostring(done))
+            end
+            ZA.log("[ZA] autodrive: long way " .. (path and (#path .. " points") or "not found"))
+            r.navBuild, r.long, r.wi = nil, path, 1
+            r.plannedAt = 0
+            pcall(RT.replan, v)
+            r.setAt = t
+        end
+        return
+    end
     -- back from a pause: the cruise control on again at the speed it had (in case the pause let go of it)
     if r.reassert then
         r.reassert = nil
