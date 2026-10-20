@@ -76,6 +76,15 @@ local function edgeCost(x, y, z)
     end
     return e
 end
+-- Something a car can't drive through on a square: a wall, a solid object, or another car (a wreck across the road;
+-- 2026-10-20 the autodrive stopped at those instead of going round them).
+local function blockedSq(sq)
+    if sq:isSolid() or sq:isSolidTrans() then return true end
+    local ok, ov = pcall(function() return sq:getVehicleContainer() end)
+    return ok and ov ~= nil and ov ~= RT.ownV
+end
+RT.blockedSq = blockedSq
+
 local function cost(x, y, z)
     local k = x * 100000 + y
     local c = costCache[k]
@@ -83,8 +92,10 @@ local function cost(x, y, z)
     local sq = getCell():getGridSquare(x, y, z)
     if not sq then costCache[k] = false; return nil end
     if roadAt(x, y, z) then
-        c = (sq:isSolid() or sq:isSolidTrans()) and false or (1 + edgeCost(x, y, z))
-    elseif not nearEnds(x, y) or sq:getRoom() or sq:isSolid() or sq:isSolidTrans() or not sq:getFloor() then
+        -- (not "blocked and false or cost": false there falls through to the cost, so walls and solid things
+        -- on the road were never avoided until 2026-10-20)
+        if blockedSq(sq) then c = false else c = 1 + edgeCost(x, y, z) end
+    elseif not nearEnds(x, y) or sq:getRoom() or blockedSq(sq) or not sq:getFloor() then
         c = false
     else
         c = 25
@@ -104,6 +115,8 @@ end
 -- whether they reach the target.
 function RT.plan(sx, sy, tx, ty, z)
     costCache, roadCache = {}, {}
+    RT.ownV = nil
+    pcall(function() RT.ownV = getPlayer():getVehicle() end)   -- (its own squares are not "another car")
     ends = { { sx, sy }, { tx, ty } }
     local st = RT.step
     local dx, dy = tx - sx, ty - sy
@@ -284,6 +297,8 @@ function RT.start(e, mode)
     if not v or not v:isDriver(p) then return false end
     if RT.route then RT.stop(true) end
     RT.route = { entry = e, mode = mode, saidTurn = {}, lastBand = nil }
+    -- a failed check of the body turning is tried again on the next drive
+    if RT.cal.failed then RT.cal, RT.steerMode = {}, "yaw" end
     local ok, res = pcall(RT.replan, v)
     if not ok or not res then
         RT.route = nil
@@ -456,17 +471,52 @@ function RT.tick()
             RT.steerMode, speed, want, r.steer, off, sharp, tostring(sharpAt and math.floor(sharpAt))))
     end
     if DR.lastAhead and DR.lastAhead.what == "Zombie" and t - DR.lastAhead.t < 1500 then want = math.min(want, 15) end
-    -- something in the road close ahead: stop
-    -- (only things ON the road: the straight-line look ahead finds the trees beside every bend, and the route
-    -- already goes round trees and walls)
-    local la = DR.lastAhead
-    if la and (la.what == "Car" or la.what == "OnRoad") and la.d < math.max(8, speed / 3.6 * 2)
-        and t - la.t < 600 then
-        v:setRegulator(false)
-        r.stopping = true
-        if speed > 2 then brake(v); return end
-        RT.stop(false, ZA.tr(DR.lastAhead.what == "Car" and "Route_InWayCar" or "Route_InWayRoad"))
-        return
+    -- Something ON THE ROUTE close ahead (a wreck, a solid thing): plan again round it, and only if there is no
+    -- way round, stop. Looked for on the route itself (its middle: a route that squeezes past a wreck runs a square
+    -- from it, so its sides would stop it there), not straight ahead
+    -- of the car: that line runs off the road at every bend (2026-10-20: "Obstacle on the road" and the autodrive
+    -- given up, with the route going round it).
+    local blockedAhead = nil
+    do
+        local reach = math.max(8, speed / 3.6 * 2)
+        local cell = getCell()
+        local z = math.floor(v:getZ())
+        for dd = 3, reach, 1 do
+            local x, y = along(r, i, dd)
+            local x2, y2 = along(r, i, dd + 0.5)
+            local hx, hy = x2 - x, y2 - y
+            local l = math.sqrt(hx * hx + hy * hy)
+            if l > 0.01 then hx, hy = hx / l, hy / l end
+            for _, side in ipairs({ 0 }) do
+                local sq = cell:getGridSquare(math.floor(x - hy * side), math.floor(y + hx * side), z)
+                RT.ownV = v
+                if sq and blockedSq(sq) then blockedAhead = dd; break end
+            end
+            if blockedAhead then break end
+        end
+    end
+    if blockedAhead then
+        if not r.roundAt or t - r.roundAt > 1500 then
+            r.roundAt = t
+            local before = r.pts
+            if RT.replan(v) then
+                ZA.log("[ZA] autodrive: something on the route at " .. blockedAhead .. " m, planned round it")
+                if not r.saidRound then ZA.say(ZA.tr("Route_GoingRound")); r.saidRound = true end
+                return
+            end
+            r.pts = before
+        end
+        -- no way round, or the new route still meets it: stop
+        if blockedAhead <= math.max(5, speed / 3.6 * 1.2) then
+            v:setRegulator(false)
+            r.stopping = true
+            if speed > 2 then brake(v); return end
+            RT.stop(false, ZA.tr("Route_InWayRoad"))
+            return
+        end
+        want = math.min(want, 5)
+    else
+        r.saidRound = nil
     end
     if want ~= r.speed then setSpeed(v, want); r.speed = want; r.setAt = t end
 
@@ -518,6 +568,9 @@ local function pushYaw(r, v, speed)
     local ms = speed / 3.6
     if ms < 0.8 then return end   -- (also not backwards)
     local C = RT.cal
+    -- the check needs the car really moving forward: at walking pace, or backing out, the tyres hold it
+    -- (2026-10-20: checked at 0.8 m/s with the route behind, failed, and the drive went on with the push)
+    if not C.sign and ms < 2 then return end
     if not C.sign then
         -- which way, and does it keep the speed: turn 3 degrees, look again 0.2 s later
         if not C.at then
@@ -533,6 +586,7 @@ local function pushYaw(r, v, speed)
         C.at = nil
         if math.abs(cross) < 0.02 or ms2 < C.ms * 0.6 then
             RT.steerMode = "push"
+            C.failed = true
             ZA.log(string.format("[ZA] autodrive: turning the body doesn't work (turned %.3f, speed %.1f -> %.1f m/s), back to the push",
                 cross, C.ms, ms2))
             return
