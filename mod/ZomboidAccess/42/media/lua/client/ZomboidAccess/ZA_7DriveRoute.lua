@@ -85,6 +85,39 @@ local function blockedSq(sq)
 end
 RT.blockedSq = blockedSq
 
+-- A tree, a wall or another car on a square (cached per plan).
+local hardCache
+local function hardAt(x, y, z)
+    local k = x * 100000 + y
+    local h = hardCache[k]
+    if h ~= nil then return h end
+    h = false
+    local sq = getCell():getGridSquare(x, y, z)
+    if sq then
+        if blockedSq(sq) then h = true
+        else
+            local objs = sq:getObjects()
+            for i = 0, objs:size() - 1 do
+                if instanceof(objs:get(i), "IsoTree") then h = true; break end
+            end
+        end
+    end
+    hardCache[k] = h
+    return h
+end
+
+-- A car is about two squares wide: a route square right next to a tree or a wall puts the car's side into it
+-- (2026-10-20: the car hit a tree 3 metres off a route that went past it). Such squares cost far more, so the route
+-- keeps a square away when it can, and still squeezes through when there is no other way.
+local function nextToHard(x, y, z)
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            if (dx ~= 0 or dy ~= 0) and hardAt(x + dx, y + dy, z) then return true end
+        end
+    end
+    return false
+end
+
 local function cost(x, y, z)
     local k = x * 100000 + y
     local c = costCache[k]
@@ -105,6 +138,7 @@ local function cost(x, y, z)
             if instanceof(o, "IsoTree") then c = false; break end
         end
     end
+    if c and nextToHard(x, y, z) then c = c + 30 end
     costCache[k] = c
     return c or nil
 end
@@ -114,7 +148,7 @@ end
 -- (NOT towards a point on the straight line: that can be a fenced field, a dead end). Returns the points and
 -- whether they reach the target.
 function RT.plan(sx, sy, tx, ty, z)
-    costCache, roadCache = {}, {}
+    costCache, roadCache, hardCache = {}, {}, {}
     RT.ownV = nil
     pcall(function() RT.ownV = getPlayer():getVehicle() end)   -- (its own squares are not "another car")
     ends = { { sx, sy }, { tx, ty } }
