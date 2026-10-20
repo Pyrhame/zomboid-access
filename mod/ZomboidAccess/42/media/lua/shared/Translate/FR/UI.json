@@ -1247,5 +1247,13 @@
     "UI_ZA_Radio_UnfoldHint": "Droite le déplie",
     "UI_ZA_Radio_WindowHint": "{R1} : entrer dans les réglages, puis Haut et Bas passent de l'un à l'autre",
     "UI_ZA_Route_Stuck": "La voiture est bloquée. Conduite automatique arrêtée : recule ou dégage-la toi-même, puis choisis de nouveau le lieu.",
+    "UI_ZA_Alarm_HourUp": "Heure plus 1, {Cross}",
+    "UI_ZA_Alarm_HourDown": "Heure moins 1, {Cross}",
+    "UI_ZA_Alarm_MinUp": "Minutes plus 10, {Cross}",
+    "UI_ZA_Alarm_MinDown": "Minutes moins 10, {Cross}",
+    "UI_ZA_Alarm_Time": "réglée sur %1 h %2",
+    "UI_ZA_Alarm_IsOn": "alarme activée",
+    "UI_ZA_Alarm_IsOff": "alarme désactivée",
+    "UI_ZA_Alarm_Ok": "OK : garde ce réglage et ferme, {Cross}",
     "UI_ZA_Core_DecimalSep": ","
 }

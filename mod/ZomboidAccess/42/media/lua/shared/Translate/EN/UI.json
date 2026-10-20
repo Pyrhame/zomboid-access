@@ -1247,5 +1247,13 @@
     "UI_ZA_Radio_UnfoldHint": "Right unfolds it",
     "UI_ZA_Radio_WindowHint": "{R1}: into the settings, then Up and Down go from one to the next",
     "UI_ZA_Route_Stuck": "The car is stuck. Autodrive stopped: back out or get it free yourself, then pick the place again.",
+    "UI_ZA_Alarm_HourUp": "Hour plus 1, {Cross}",
+    "UI_ZA_Alarm_HourDown": "Hour minus 1, {Cross}",
+    "UI_ZA_Alarm_MinUp": "Minutes plus 10, {Cross}",
+    "UI_ZA_Alarm_MinDown": "Minutes minus 10, {Cross}",
+    "UI_ZA_Alarm_Time": "set to %1:%2",
+    "UI_ZA_Alarm_IsOn": "alarm on",
+    "UI_ZA_Alarm_IsOff": "alarm off",
+    "UI_ZA_Alarm_Ok": "OK: keeps this setting and closes, {Cross}",
     "UI_ZA_Core_DecimalSep": "."
 }
