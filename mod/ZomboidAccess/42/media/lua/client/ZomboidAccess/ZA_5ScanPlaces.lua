@@ -54,13 +54,25 @@ S.towns = {   -- median of each town's spawn points (media/maps/<Town>/spawnpoin
     { name = "Valley Station", x = 12595, y = 5330 },
 }
 
-table.insert(S.builders, function(lists)
+function S.placesBuilder(lists)
     local p = getPlayer()
     local px, py = p:getX(), p:getY()
     local mg = getWorld():getMetaGrid()
     local list = ArrayList.new()   -- (entries are keyed by position: getID() is not unique for unloaded buildings)
     local R = S.placesRadius
-    mg:getBuildingsIntersecting(math.floor(px) - R, math.floor(py) - R, 2 * R, 2 * R, list)
+    -- IsoMetaGrid:getBuildingsIntersecting only looks in the one map cell (256 x 256) holding the rectangle's top
+    -- left corner: its loop adds the grid's size in cells to a position in squares (build 42.21). In game
+    -- 2026-10-19 that corner fell in an empty cell and no house or shop was found, with 35 houses within 300 m.
+    -- So ask cell by cell, each with the part of the rectangle inside it (the game skips buildings already listed).
+    local x1, y1 = math.floor(px) - R, math.floor(py) - R
+    local x2, y2 = x1 + 2 * R, y1 + 2 * R
+    for cy = math.floor(y1 / 256), math.floor((y2 - 1) / 256) do
+        for cx = math.floor(x1 / 256), math.floor((x2 - 1) / 256) do
+            local ax, ay = math.max(x1, cx * 256), math.max(y1, cy * 256)
+            local bx, by = math.min(x2, (cx + 1) * 256), math.min(y2, (cy + 1) * 256)
+            if bx > ax and by > ay then mg:getBuildingsIntersecting(ax, ay, bx - ax, by - ay, list) end
+        end
+    end
     for i = 0, list:size() - 1 do
         local b = list:get(i)
         local kind = buildingKind(b)
@@ -112,4 +124,9 @@ table.insert(S.builders, function(lists)
             name = here and ZA.tr("ScanPlaces_TownHere", t.name) or ZA.tr("ScanPlaces_Town", t.name), x = t.x, y = t.y, z = 0,
         })
     end
-end)
+end
+-- Registered once (through S.placesBuilder, looked up each time), so this file can be reloaded in a running game.
+if not S.placesHooked then
+    S.placesHooked = true
+    table.insert(S.builders, function(lists) S.placesBuilder(lists) end)
+end
