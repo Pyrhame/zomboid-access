@@ -209,6 +209,21 @@ local function glassDoor(o)
     return glass
 end
 
+-- A door or window is on both its sides: the square on its other side (a north one sits between y and y - 1,
+-- a west one between x - 1 and x), or nil when it is not a passage.
+local function passageOtherSide(o, sq)
+    if not o or not sq then return nil end
+    local passage = instanceof(o, "IsoDoor") or instanceof(o, "IsoWindow")
+    if not passage and instanceof(o, "IsoThumpable") then
+        pcall(function() passage = o:isDoor() or o:isWindow() end)
+    end
+    if not passage then return nil end
+    local north = false
+    pcall(function() north = o:getNorth() end)
+    if north then return getCell():getGridSquare(sq:getX(), sq:getY() - 1, sq:getZ()) end
+    return getCell():getGridSquare(sq:getX() - 1, sq:getY(), sq:getZ())
+end
+
 local function doorName(e)
     local o = e.obj
     local n = e.baseName
@@ -218,11 +233,19 @@ local function doorName(e)
     local barr = false
     pcall(function() barr = o:isBarricaded() end)
     if barr then n = n .. ", " .. ZA.tr("Scan_Barricaded") end
+    -- a door between a building and the outside (Marc, 2026-10-19): the game's own test (IsoDoor:isExterior), or a
+    -- building on one side only; isExterior misses some (in game 2026-10-22, a hall door to the garden said nothing)
+    local outside = false
+    if instanceof(o, "IsoDoor") then pcall(function() outside = o:isExterior() end) end
+    if not outside then
+        pcall(function()
+            local sq = o:getSquare()
+            local other = passageOtherSide(o, sq)
+            if other then outside = (sq:getBuilding() == nil) ~= (other:getBuilding() == nil) end
+        end)
+    end
+    if outside then n = n .. ", " .. ZA.tr("Scan_DoorOutside") end
     if instanceof(o, "IsoDoor") then
-        -- a door between a building and the outside (IsoDoor:isExterior, the game's own test; Marc, 2026-10-19)
-        local outside = false
-        pcall(function() outside = o:isExterior() end)
-        if outside then n = n .. ", " .. ZA.tr("Scan_DoorOutside") end
         local c = glassDoor(o) and curtainWords(o)
         if c then n = n .. ", " .. c end
     end
@@ -610,21 +633,6 @@ function S.build()
     for _, c in ipairs(S.categories) do table.insert(counts, c.key .. "=" .. #lists[c.key]) end
     ZA.log("[ZA] scan: " .. nsq .. " squares in " .. S.stats.ms .. " ms; " .. table.concat(counts, " ")
         .. (S.stats.lastError and (" ERROR " .. S.stats.lastError) or ""))
-end
-
--- A door or window is on both its sides: the square on its other side (a north one sits between y and y - 1,
--- a west one between x - 1 and x), or nil when it is not a passage.
-local function passageOtherSide(o, sq)
-    if not o then return nil end
-    local passage = instanceof(o, "IsoDoor") or instanceof(o, "IsoWindow")
-    if not passage and instanceof(o, "IsoThumpable") then
-        pcall(function() passage = o:isDoor() or o:isWindow() end)
-    end
-    if not passage then return nil end
-    local north = false
-    pcall(function() north = o:getNorth() end)
-    if north then return getCell():getGridSquare(sq:getX(), sq:getY() - 1, sq:getZ()) end
-    return getCell():getGridSquare(sq:getX() - 1, sq:getY(), sq:getZ())
 end
 
 -- Same floor first, then the same side of the walls (inside this building, or outdoors), then nearest:
