@@ -653,10 +653,19 @@ function RT.tick()
         end
     end
 
-    -- where to aim: further ahead the faster you go
-    local look = math.max(6, math.min(22, 5 + math.abs(speed) / 3.6 * 0.8))
+    -- where to aim: further ahead the faster you go, and further still on a straight stretch: a near point made
+    -- the push correct left, right, left (2026-10-20: about 12 degrees each way, every second, and the speed held
+    -- at 9 km/h for a cruise control of 20, each push dragging the tyres sideways)
+    r.straight = (sharpAhead(r, i, 35)) < 20
+    local look
+    if r.straight then
+        look = math.max(10, math.min(28, 6 + math.abs(speed) / 3.6 * 1.4))
+    else
+        look = math.max(6, math.min(22, 5 + math.abs(speed) / 3.6 * 0.8))
+    end
     local ax, ay = along(r, i, look)
     r.steer = bearing(v, ax, ay)
+    r.look = look
     -- the route is behind you: say so, once each time
     if math.abs(r.steer) > 110 then
         if not r.saidBehind then ZA.say(ZA.tr("Route_Behind")); r.saidBehind = true end
@@ -698,18 +707,30 @@ function RT.tick()
         ZA.log("[ZA] autodrive: backed away, on again")
         return
     end
+    -- our own braking (see below) switches cruise control off for a moment: on again once it's over
+    if r.selfBrakeAt and t - r.selfBrakeAt > 1200 and not v:isRegulator() and r.speed and r.speed > 0 then
+        setSpeed(v, r.speed); r.setAt = t; r.selfBrakeAt = nil
+    end
     -- the player braked or reversed: the game switched cruise control off; the car is theirs
-    if r.speed and r.speed > 0 and not r.stopping and not v:isRegulator() and t - (r.setAt or 0) > 500 then
+    if r.speed and r.speed > 0 and not r.stopping and not v:isRegulator() and t - (r.setAt or 0) > 500
+        and not (r.selfBrakeAt and t - r.selfBrakeAt < 2500) then
         RT.stop(false, ZA.tr("Route_AutoOff"))
         return
     end
     -- speed: by how sharp the road ahead turns, so the car is slow BEFORE the bend (2026-10-20: it hit walls at
     -- junctions, still at 20 km/h in the turn); slower near zombies and near the end
-    local want = RT.cruise or 20
-    local sharp, sharpAt = sharpAhead(r, i, 35)
-    if sharp >= 70 then want = math.min(want, (sharpAt or 0) < 15 and 8 or 12)
-    elseif sharp >= 40 then want = math.min(want, (sharpAt or 0) < 15 and 12 or 15)
-    elseif sharp >= 20 then want = math.min(want, 20) end
+    -- 40 km/h on a clear road (Marc, 2026-10-20; 20 before). A bend is looked for further ahead the faster the car
+    -- goes (5 s of driving, at least 35 m), and its speed for the bend (8, 12, 15 or 20 by how sharp) is allowed to
+    -- rise by 1 km/h for each metre still before it, so the car comes down to it gradually and is there in time.
+    local want = RT.cruise or 40
+    local within = math.max(35, math.abs(speed) / 3.6 * 5)
+    local sharp, sharpAt = sharpAhead(r, i, within)
+    local bendSpeed
+    if sharp >= 70 then bendSpeed = 8
+    elseif sharp >= 40 then bendSpeed = 12
+    elseif sharp >= 30 then bendSpeed = 15
+    elseif sharp >= 20 then bendSpeed = 20 end
+    if bendSpeed then want = math.min(want, bendSpeed + math.max(0, (sharpAt or 0) - 10)) end
     if math.abs(r.steer) > 25 then want = math.min(want, 12) end
     if math.abs(r.steer) > 45 then want = math.min(want, 8) end
     if math.abs(r.steer) > 100 then want = math.min(want, 5) end   -- turning round
@@ -741,8 +762,9 @@ function RT.tick()
     -- developer log: how the car follows the route, twice a second
     if ZA.dev and t >= (r.logAt or 0) then
         r.logAt = t + 500
-        ZA.log(string.format("[ZA] autodrive: %s %.0f km/h (want %d), steer %.0f, off route %.1f, sharp %.0f at %s",
-            RT.steerMode, speed, want, r.steer, off, sharp, tostring(sharpAt and math.floor(sharpAt))))
+        ZA.log(string.format("[ZA] autodrive: %s %.0f km/h (want %d), steer %.0f, rate %.0f, push %.0f, off route %.1f, sharp %.0f at %s%s",
+            RT.steerMode, speed, want, r.steer, r.lastRate or 0, r.lastF or 0, off, sharp,
+            tostring(sharpAt and math.floor(sharpAt)), r.straight and ", straight" or ""))
     end
     if DR.lastAhead and DR.lastAhead.what == "Zombie" and t - DR.lastAhead.t < 1500 then want = math.min(want, 15) end
     -- Something ON THE ROUTE close ahead (a wreck, a solid thing): plan again round it, and only if there is no
@@ -793,6 +815,12 @@ function RT.tick()
         r.saidRound = nil
     end
     if want ~= r.speed then setSpeed(v, want); r.speed = want; r.setAt = t end
+    -- Cruise control only lets go of the pedal: from 40 the car coasts down slowly. Well over the speed wanted
+    -- (a bend or an obstacle coming), brake for a moment, the game's own brake, at most every 1.5 s.
+    if speed > want + 8 and t - (r.selfBrakeAt or 0) > 1500 then
+        r.selfBrakeAt = t
+        brake(v)
+    end
 
     -- steering: RT.push, on every frame drawn. The game keeps one push per physics step and a second, BIGGER push
     -- before the step CANCELS the first (BaseVehicle.addImpulse, decompiled): so the push is always the same size and
@@ -956,10 +984,21 @@ function RT.push()
     if math.abs(speed) < 3 then return end
     -- (measured 2026-10-02: on the move the tyres hold the car straight until the push passes about 400; above it
     -- the car turns, about 35 degrees a second at 560. So any correction starts at that threshold.)
-    local e = r.steer - 0.35 * rate              -- the error, less how fast it's already turning towards it
+    -- Steer by how fast the car should be turning, not by how far off it points. The push used to answer the angle
+    -- to the aim point (380 + 22 a degree, up to 1500): at a crawl that spun the car 150 to 200 degrees a second
+    -- one way then the other (2026-10-20, logged: push +1500, -1500, +1500... each half second, 7 km/h for a cruise
+    -- control of 20). Now the turn rate the route asks for at this speed (pure pursuit: 2 v sin(angle) / distance
+    -- to the aim point) is compared with the one the car has, and only the difference is pushed: past the tyres'
+    -- hold (about 380, measured 2026-10-02) by 5 a degree a second (560 gave 35 degrees a second).
+    local ms = math.abs(speed) / 3.6
+    local want = math.deg(2 * ms * math.sin(math.rad(r.steer)) / math.max(1, r.look or 8))
+    local cap = math.deg(ms / 5)                 -- no tighter than a 5 m circle
+    if math.abs(r.steer) > 90 then want = r.steer > 0 and cap or -cap end   -- (behind: as tight as it can)
+    if want > cap then want = cap elseif want < -cap then want = -cap end
+    local e = want - rate
     local f = 0
-    if e > 2 then f = 380 + 22 * e elseif e < -2 then f = -380 + 22 * e end
-    if f > 1500 then f = 1500 elseif f < -1500 then f = -1500 end
+    if e > 4 then f = 380 + 5 * e elseif e < -4 then f = -380 + 5 * e end
+    if f > 1100 then f = 1100 elseif f < -1100 then f = -1100 end
     r.lastF, r.lastRate = f, rate
     -- the push itself is always the same small size (5), so a second call before the update never counts as
     -- "bigger"; the turn comes from where it's applied: f / 5 squares in front of the car (behind it for the other
