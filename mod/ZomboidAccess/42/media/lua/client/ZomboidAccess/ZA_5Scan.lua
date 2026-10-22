@@ -564,9 +564,11 @@ function S.build()
         if not ok then S.stats.lastError = tostring(err) end
     end
     local px, py, pz = math.floor(p:getX()), math.floor(p:getY()), math.floor(p:getZ())
-    local r = S.radius
     local nsq = 0
     for z = pz - 1, pz + 1 do
+        -- (the floors above and below stay at 20 m when the scan is widened: 40 m on three floors is 20000
+        -- squares, about 0.4 s a look)
+        local r = (z == pz) and S.radius or math.min(S.radius, 20)
         if z >= -32 then
             for x = px - r, px + r do
                 for y = py - r, py + r do
@@ -804,6 +806,15 @@ function S.repeatCurrent()
     speakEntry(i)
 end
 
+-- F8: the scan widened to 40 m, the loot too, in every building round you, not only the one you're in (Marc,
+-- 2026-10-22); F8 again for the usual 20 m.
+function S.toggleWide()
+    S.wide = not S.wide
+    S.radius = S.wide and 40 or 20
+    S.builtAt = -1e9
+    ZA.say(ZA.tr(S.wide and "Scan_WideOn" or "Scan_WideOff"))
+end
+
 function S.toggleSeen()
     S.seenOnly = not S.seenOnly
     S.builtAt = -1e9
@@ -841,6 +852,8 @@ function S.onKey(key)
             if mod then S.switchCategory(-1) else S.step(-1) end
         elseif key == Keyboard.KEY_HOME then
             if mod then S.toggleSeen() else S.repeatCurrent() end
+        elseif key == Keyboard.KEY_F8 then
+            S.toggleWide()
         end
     end)
     if not ok then print("[ZA] scan key error: " .. tostring(err)) end

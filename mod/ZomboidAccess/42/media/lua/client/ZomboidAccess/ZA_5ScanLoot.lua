@@ -1,6 +1,6 @@
 -- Zomboid Access: what's inside the containers around you, sorted into the scanner's "Loot" categories
 -- (food and drink, weapons, medical, tools, clothes and bags, books, everything else).
--- Indoors: every container in the building you're in, every floor. Outdoors: containers and bodies within 8 metres.
+-- Indoors: every container in the building you're in, every floor. Outdoors: containers and bodies within 8 metres. F8 widens it: 40 metres, every building.
 -- Each line: the item (how many), the container it's in, distance, direction, room.
 -- Hold Square (or press Delete) on one: walk to that container and open it with the item selected.
 
@@ -61,16 +61,19 @@ local function addContainer(lists, c, obj, title, x, y, z, keyBase, onBody)
     end
 end
 
-table.insert(S.postBuilders, function(lists)
+-- registered once through a wrapper, so a reload of this file replaces the builder instead of adding a second
+function S.lootPost(lists)
     local p = getPlayer()
     local psq = p:getCurrentSquare()
     local building = psq and psq:getBuilding()
     local px, py = p:getX(), p:getY()
-    local function near(e) return (e.x - px) ^ 2 + (e.y - py) ^ 2 <= 64 end
+    -- 8 m outdoors; 40 m everywhere, every building, when the scan is widened (F8, S.toggleWide)
+    local reach = S.wide and 40 or 8
+    local function near(e) return (e.x - px) ^ 2 + (e.y - py) ^ 2 <= reach * reach end
     for _, e in ipairs(lists.containers) do
         local sq = e.obj:getSquare()
         local keep
-        if building then keep = sq and sq:getBuilding() == building else keep = near(e) end
+        if building and not S.wide then keep = sq and sq:getBuilding() == building else keep = near(e) end
         if keep and e.container then
             -- "green counter", not "green counter, cupboard"; but keep the part when the object has more than one
             -- (a fridge's freezer, an oven's grill), or a frozen sausage sounds like it's in the fridge.
@@ -87,4 +90,9 @@ table.insert(S.postBuilders, function(lists)
             addContainer(lists, c, e.obj, e.baseName:lower(), e.x, e.y, e.z, e.key, true)
         end
     end
-end)
+end
+
+if not S.lootHooked then
+    S.lootHooked = true
+    table.insert(S.postBuilders, function(lists) S.lootPost(lists) end)
+end
