@@ -612,9 +612,24 @@ function S.build()
         .. (S.stats.lastError and (" ERROR " .. S.stats.lastError) or ""))
 end
 
--- Same floor first, then nearest.
+-- A door or window is on both its sides: the square on its other side (a north one sits between y and y - 1,
+-- a west one between x - 1 and x), or nil when it is not a passage.
+local function passageOtherSide(o, sq)
+    if not o then return nil end
+    local passage = instanceof(o, "IsoDoor") or instanceof(o, "IsoWindow")
+    if not passage and instanceof(o, "IsoThumpable") then
+        pcall(function() passage = o:isDoor() or o:isWindow() end)
+    end
+    if not passage then return nil end
+    local north = false
+    pcall(function() north = o:getNorth() end)
+    if north then return getCell():getGridSquare(sq:getX(), sq:getY() - 1, sq:getZ()) end
+    return getCell():getGridSquare(sq:getX() - 1, sq:getY(), sq:getZ())
+end
+
 -- Same floor first, then the same side of the walls (inside this building, or outdoors), then nearest:
--- a toilet 5 metres away through a wall is further than it sounds.
+-- a toilet 5 metres away through a wall is further than it sounds. A door or window in your side's wall counts as
+-- your side (in game 2026-10-22, the locked front door 1 m away came 5th, behind doors 8 to 15 m away outdoors).
 function S.sort()
     local p = getPlayer()
     local pz = math.floor(p:getZ())
@@ -629,7 +644,10 @@ function S.sort()
             e.sideGap = 0
             if not e.far and not e.noWhere then
                 local sq = getCell():getGridSquare(math.floor(x), math.floor(y), math.floor(z))
-                if sq and sq:getBuilding() ~= myBuilding then e.sideGap = 1 end
+                if sq and sq:getBuilding() ~= myBuilding then
+                    local other = passageOtherSide(e.obj, sq)
+                    if not (other and other:getBuilding() == myBuilding) then e.sideGap = 1 end
+                end
             end
         end
         table.sort(list, function(a, b)
