@@ -1449,5 +1449,6 @@
     "UI_ZA_Route_BackingAway": "Bloqué : je tourne pour me dégager",
     "UI_ZA_Scan_WideOn": "Scanner élargi : 40 mètres, butin de tous les bâtiments autour de toi. F8 pour revenir à 20.",
     "UI_ZA_Scan_WideOff": "Scanner revenu à 20 mètres.",
+    "UI_ZA_LevelUp_Up": "%1, niveau %2",
     "UI_ZA_Core_DecimalSep": ","
 }

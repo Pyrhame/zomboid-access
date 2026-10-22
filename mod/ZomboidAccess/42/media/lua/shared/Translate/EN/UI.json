@@ -1449,5 +1449,6 @@
     "UI_ZA_Route_BackingAway": "Stuck: turning to get free",
     "UI_ZA_Scan_WideOn": "Scanner widened: 40 metres, loot in every building around you. F8 to go back to 20.",
     "UI_ZA_Scan_WideOff": "Scanner back to 20 metres.",
+    "UI_ZA_LevelUp_Up": "%1, level %2",
     "UI_ZA_Core_DecimalSep": "."
 }
