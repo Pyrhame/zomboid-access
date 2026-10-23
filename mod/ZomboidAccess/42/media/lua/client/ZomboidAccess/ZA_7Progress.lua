@@ -40,6 +40,7 @@ local verbs = {
     ISMoveablesAction = function() return ZA.tr("Progress_MovingFurniture") end,
     ISScrapItemAction = function() return ZA.tr("Progress_Scrapping") end,
     ISReadWorldMap = function() return ZA.tr("Progress_ReadingMap") end,
+    ISFitnessAction = function() return ZA.tr("Progress_Exercising") end,
 }
 local skip = { ISWalkToTimedAction = true, ISPathFindAction = true }
 
@@ -61,6 +62,8 @@ local function words(a)
             or t == "ISDrinkFromBottle" or t == "ISWearClothing" or t == "ISEquipWeaponAction") then
             what = a.item:getName()
         end
+        -- the exercise picked in the exercise window: "Exercising: Squats"
+        if t == "ISFitnessAction" and a.exeData and a.exeData.name then what = a.exeData.name end
     end)
     return v, what
 end
