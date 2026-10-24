@@ -1123,6 +1123,8 @@
     "UI_ZA_Guide_DirDist": "%1, %2",
     "UI_ZA_Guide_Metres": "%1 mètres",
     "UI_ZA_Guide_Blocked": "Bloqué.",
+    "UI_ZA_Halo_Up": "%1 en hausse",
+    "UI_ZA_Halo_Down": "%1 en baisse",
     "UI_ZA_LockOn_Locked": "Cible verrouillée : %1",
     "UI_ZA_LockOn_Free": "Verrouillage de cible : aucune cible",
     "UI_ZA_LockOn_Grabbed": "Il t'agrippe : {L2} le repousse, puis {R2}.",

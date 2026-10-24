@@ -1123,6 +1123,8 @@
     "UI_ZA_Guide_DirDist": "%1, %2",
     "UI_ZA_Guide_Metres": "%1 metres",
     "UI_ZA_Guide_Blocked": "Blocked.",
+    "UI_ZA_Halo_Up": "%1 going up",
+    "UI_ZA_Halo_Down": "%1 going down",
     "UI_ZA_LockOn_Locked": "Locked on: %1",
     "UI_ZA_LockOn_Free": "Lock-on free",
     "UI_ZA_LockOn_Grabbed": "It has hold of you: {L2} shoves it off, then {R2}.",
